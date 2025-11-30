@@ -2,7 +2,7 @@
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
   "description": "Drop-in LLM security for your applications",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {

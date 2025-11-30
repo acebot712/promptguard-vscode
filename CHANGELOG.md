@@ -2,7 +2,13 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
-## [0.1.0] - 2025-01-XX
+## [0.1.1] - 2025-11-30
+
+### Added
+
+- Extension icon for marketplace display
+
+## [0.1.0] - 2025-11-30
 
 ### Added
 
