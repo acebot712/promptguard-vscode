@@ -4,6 +4,7 @@
   "description": "Drop-in LLM security for your applications",
   "version": "0.1.0",
   "publisher": "promptguard",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
