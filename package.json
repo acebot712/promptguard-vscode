@@ -1,19 +1,30 @@
 {
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
-  "description": "Drop-in LLM security for your applications",
-  "version": "0.1.1",
+  "description": "Plug-and-play LLM security for your AI applications",
+  "version": "0.1.2",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
+    "AI",
+    "Machine Learning",
     "Other",
     "Linters"
   ],
   "keywords": [
     "llm",
+    "cybersecurity",
+    "firewall",
+    "jailbreak",
+    "pii-detection",
+    "data leakage",
+    "data exfiltration",
+    "data leakage prevention",
+    "data exfiltration prevention",
+    "data leakage prevention",
     "security",
     "openai",
     "anthropic",
