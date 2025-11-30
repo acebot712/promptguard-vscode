@@ -41,13 +41,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(statusBar);
   statusBarRef = statusBar;
 
-  // Update status bar periodically
-  const statusBarUpdateInterval = setInterval(() => {
+  // Update status bar on workspace changes (event-driven, not polling)
+  const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(() => {
     statusBar.updateStatus();
-  }, 30000); // Update every 30 seconds
-  context.subscriptions.push({
-    dispose: () => clearInterval(statusBarUpdateInterval),
   });
+  context.subscriptions.push(workspaceWatcher);
+
+  // Update status bar when files change (event-driven)
+  const fileWatcher = vscode.workspace.onDidSaveTextDocument(() => {
+    statusBar.updateStatus();
+  });
+  context.subscriptions.push(fileWatcher);
 
   // Initial status update
   statusBar.updateStatus();
