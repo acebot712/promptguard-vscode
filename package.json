@@ -1,0 +1,100 @@
+{
+  "name": "promptguard-vscode",
+  "displayName": "PromptGuard",
+  "description": "Drop-in LLM security for your applications",
+  "version": "0.1.0",
+  "publisher": "promptguard",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "llm",
+    "security",
+    "openai",
+    "anthropic",
+    "prompt-injection",
+    "ai-security"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "promptguard.init",
+        "title": "PromptGuard: Initialize",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.scan",
+        "title": "PromptGuard: Scan for LLM SDKs",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.status",
+        "title": "PromptGuard: Show Status",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.apply",
+        "title": "PromptGuard: Apply Transformations",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.disable",
+        "title": "PromptGuard: Disable",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.enable",
+        "title": "PromptGuard: Enable",
+        "category": "PromptGuard"
+      }
+    ],
+    "configuration": {
+      "title": "PromptGuard",
+      "properties": {
+        "promptguard.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "typescript",
+        "extensions": [".ts", ".tsx"]
+      },
+      {
+        "id": "javascript",
+        "extensions": [".js", ".jsx"]
+      },
+      {
+        "id": "python",
+        "extensions": [".py"]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/promptguard/promptguard-vscode"
+  },
+  "license": "Apache-2.0"
+}
+
