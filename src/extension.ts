@@ -14,6 +14,13 @@ let statusBar: PromptGuardStatusBar;
 let cli: CliWrapper;
 let outputChannel: vscode.OutputChannel;
 
+// Module-level status bar reference for commands
+let statusBarRef: PromptGuardStatusBar | null = null;
+
+export function getStatusBar(): PromptGuardStatusBar | null {
+  return statusBarRef;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("PromptGuard extension is now active");
 
@@ -32,9 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize status bar
   statusBar = new PromptGuardStatusBar(cli);
   context.subscriptions.push(statusBar);
-  
-  // Store status bar reference for commands
-  (vscode.window as any).promptGuardStatusBar = statusBar;
+  statusBarRef = statusBar;
 
   // Update status bar periodically
   const statusBarUpdateInterval = setInterval(() => {
@@ -72,6 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  statusBarRef = null;
   if (diagnostics) {
     diagnostics.dispose();
   }

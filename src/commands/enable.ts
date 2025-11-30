@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
+import { getStatusBar } from "../extension";
+import { ExtensionError } from "../types";
 
 export async function enableCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
   outputChannel.appendLine("PromptGuard: Enable");
@@ -13,12 +15,13 @@ export async function enableCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     vscode.window.showInformationMessage("PromptGuard enabled");
 
     // Refresh status
-    const statusBar = (vscode.window as any).promptGuardStatusBar;
+    const statusBar = getStatusBar();
     if (statusBar) {
       await statusBar.updateStatus();
     }
-  } catch (error: any) {
-    const message = error.message || String(error);
+  } catch (error) {
+    const err = error instanceof ExtensionError ? error : new ExtensionError(String(error), undefined, error);
+    const message = err.message;
     outputChannel.appendLine(`✗ Error: ${message}`);
     vscode.window.showErrorMessage(`PromptGuard enable failed: ${message}`);
   }

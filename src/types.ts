@@ -36,5 +36,16 @@ export interface CliError {
   message: string;
   code?: number;
   stderr?: string;
+  stdout?: string;
 }
 
+export class ExtensionError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly originalError?: unknown
+  ) {
+    super(message);
+    this.name = "ExtensionError";
+  }
+}

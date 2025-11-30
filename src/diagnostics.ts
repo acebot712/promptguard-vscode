@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "./cli";
-import { ScanResult } from "./types";
+import { ScanResult, ExtensionError } from "./types";
 
 export class PromptGuardDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
@@ -44,7 +44,7 @@ export class PromptGuardDiagnostics {
     try {
       const result = await this.cli.scan();
       this.updateDiagnostics(result);
-    } catch (error: any) {
+    } catch (error) {
       // Silently fail - CLI might not be installed or project not initialized
       // Don't spam user with errors
       this.diagnosticCollection.clear();
