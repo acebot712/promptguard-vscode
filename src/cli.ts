@@ -91,12 +91,13 @@ export class CliWrapper {
         cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd(),
       });
       return { stdout: stdout.trim(), stderr: stderr.trim() };
-    } catch (error: any) {
-      const stderr = error.stderr || error.message || "";
-      const stdout = error.stdout || "";
+    } catch (error) {
+      const err = error as { stderr?: string; stdout?: string; message?: string; code?: number };
+      const stderr = err.stderr || err.message || "";
+      const stdout = err.stdout || "";
       throw {
         message: `Command failed: promptguard ${args.join(" ")}`,
-        code: error.code,
+        code: err.code,
         stderr,
         stdout,
       } as CliError;
