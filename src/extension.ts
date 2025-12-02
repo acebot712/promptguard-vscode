@@ -9,16 +9,13 @@ import { applyCommand } from "./commands/apply";
 import { disableCommand } from "./commands/disable";
 import { enableCommand } from "./commands/enable";
 
-let diagnostics: PromptGuardDiagnostics;
-let statusBar: PromptGuardStatusBar;
-let cli: CliWrapper;
-let outputChannel: vscode.OutputChannel;
-
-// Module-level status bar reference for commands
-let statusBarRef: PromptGuardStatusBar | null = null;
+let diagnostics: PromptGuardDiagnostics | null = null;
+let statusBar: PromptGuardStatusBar | null = null;
+let cli: CliWrapper | null = null;
+let outputChannel: vscode.OutputChannel | null = null;
 
 export function getStatusBar(): PromptGuardStatusBar | null {
-  return statusBarRef;
+  return statusBar;
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -39,31 +36,33 @@ export function activate(context: vscode.ExtensionContext) {
   // Initialize status bar
   statusBar = new PromptGuardStatusBar(cli);
   context.subscriptions.push(statusBar);
-  statusBarRef = statusBar;
 
   // Update status bar on workspace changes (event-driven, not polling)
   const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    statusBar.updateStatus();
+    statusBar?.updateStatus();
   });
   context.subscriptions.push(workspaceWatcher);
 
   // Update status bar when files change (event-driven)
   const fileWatcher = vscode.workspace.onDidSaveTextDocument(() => {
-    statusBar.updateStatus();
+    statusBar?.updateStatus();
   });
   context.subscriptions.push(fileWatcher);
 
   // Initial status update
   statusBar.updateStatus();
 
-  // Register commands
+  // Register commands - capture references to avoid null checks in closures
+  const cliRef = cli;
+  const outputRef = outputChannel;
+  
   const commands = [
-    vscode.commands.registerCommand("promptguard.init", () => initCommand(cli, outputChannel)),
-    vscode.commands.registerCommand("promptguard.scan", () => scanCommand(cli, outputChannel)),
-    vscode.commands.registerCommand("promptguard.status", () => statusCommand(cli, outputChannel)),
-    vscode.commands.registerCommand("promptguard.apply", () => applyCommand(cli, outputChannel)),
-    vscode.commands.registerCommand("promptguard.disable", () => disableCommand(cli, outputChannel)),
-    vscode.commands.registerCommand("promptguard.enable", () => enableCommand(cli, outputChannel)),
+    vscode.commands.registerCommand("promptguard.init", () => initCommand(cliRef, outputRef)),
+    vscode.commands.registerCommand("promptguard.scan", () => scanCommand(cliRef, outputRef)),
+    vscode.commands.registerCommand("promptguard.status", () => statusCommand(cliRef, outputRef)),
+    vscode.commands.registerCommand("promptguard.apply", () => applyCommand(cliRef, outputRef)),
+    vscode.commands.registerCommand("promptguard.disable", () => disableCommand(cliRef, outputRef)),
+    vscode.commands.registerCommand("promptguard.enable", () => enableCommand(cliRef, outputRef)),
   ];
 
   context.subscriptions.push(...commands);
@@ -71,8 +70,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Listen for configuration changes
   const configWatcher = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("promptguard.cliPath")) {
-      cli.resetCache();
-      statusBar.updateStatus();
+      cli?.resetCache();
+      statusBar?.updateStatus();
     }
   });
   context.subscriptions.push(configWatcher);
@@ -81,12 +80,15 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  statusBarRef = null;
   if (diagnostics) {
     diagnostics.dispose();
+    diagnostics = null;
   }
   if (statusBar) {
     statusBar.dispose();
+    statusBar = null;
   }
+  cli = null;
+  outputChannel = null;
 }
 

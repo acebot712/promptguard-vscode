@@ -1,11 +1,8 @@
 import * as vscode from "vscode";
 import * as child_process from "child_process";
-import * as util from "util";
 import * as path from "path";
 import * as os from "os";
 import { ScanResult, StatusResult, CliError } from "./types";
-
-const exec = util.promisify(child_process.exec);
 
 export class CliWrapper {
   private cliPath: string | null = null;
@@ -20,12 +17,12 @@ export class CliWrapper {
       }
     }
 
-    // Check PATH
+    // Check PATH using 'which' (Unix) or 'where' (Windows)
     try {
-      const { stdout } = await exec("which promptguard");
-      const path = stdout.trim();
-      if (path && await this.isValidBinary(path)) {
-        return path;
+      const whichCmd = process.platform === "win32" ? "where" : "which";
+      const foundPath = await this.execSimple(whichCmd, ["promptguard"]);
+      if (foundPath && await this.isValidBinary(foundPath)) {
+        return foundPath;
       }
     } catch {
       // Not in PATH
@@ -55,10 +52,22 @@ export class CliWrapper {
     return null;
   }
 
+  private async execSimple(cmd: string, args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      child_process.execFile(cmd, args, (error, stdout) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(stdout.trim());
+      });
+    });
+  }
+
   private async isValidBinary(binPath: string): Promise<boolean> {
     try {
-      const { stdout } = await exec(`"${binPath}" --version`);
-      return stdout.trim().length > 0;
+      const stdout = await this.execSimple(binPath, ["--version"]);
+      return stdout.length > 0;
     } catch {
       return false;
     }
@@ -84,24 +93,24 @@ export class CliWrapper {
 
   async executeCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
     const cliPath = await this.getCliPath();
-    const command = `"${cliPath}" ${args.map(arg => `"${arg}"`).join(" ")}`;
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-    try {
-      const { stdout, stderr } = await exec(command, {
-        cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd(),
+    return new Promise((resolve, reject) => {
+      // Use execFile instead of exec to prevent command injection
+      // execFile passes arguments as an array, not through shell interpolation
+      child_process.execFile(cliPath, args, { cwd }, (error, stdout, stderr) => {
+        if (error) {
+          reject({
+            message: `Command failed: promptguard ${args.join(" ")}`,
+            code: error.code,
+            stderr: stderr || error.message || "",
+            stdout: stdout || "",
+          } as CliError);
+          return;
+        }
+        resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
       });
-      return { stdout: stdout.trim(), stderr: stderr.trim() };
-    } catch (error) {
-      const err = error as { stderr?: string; stdout?: string; message?: string; code?: number };
-      const stderr = err.stderr || err.message || "";
-      const stdout = err.stdout || "";
-      throw {
-        message: `Command failed: promptguard ${args.join(" ")}`,
-        code: err.code,
-        stderr,
-        stdout,
-      } as CliError;
-    }
+    });
   }
 
   async scan(provider?: string): Promise<ScanResult> {

@@ -73,6 +73,8 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       { label: "Anthropic", value: "anthropic" },
       { label: "Cohere", value: "cohere" },
       { label: "HuggingFace", value: "huggingface" },
+      { label: "Gemini (Google)", value: "gemini" },
+      { label: "Groq", value: "groq" },
     ];
 
     const selectedProviders = await vscode.window.showQuickPick(providerOptions, {

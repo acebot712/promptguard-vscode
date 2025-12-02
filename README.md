@@ -105,6 +105,8 @@ Click the status bar to view detailed status.
 - Anthropic
 - Cohere
 - HuggingFace
+- Gemini (Google)
+- Groq
 
 ## Troubleshooting
 
@@ -127,7 +129,7 @@ If you see "CLI not found" errors:
 - [PromptGuard Website](https://promptguard.co)
 - [Documentation](https://docs.promptguard.co)
 - [CLI Repository](https://github.com/acebot712/promptguard-cli)
-- [Report Issues](https://github.com/promptguard/promptguard-vscode/issues)
+- [Report Issues](https://github.com/acebot712/promptguard-vscode/issues)
 
 ## License
 
