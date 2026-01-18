@@ -18,9 +18,7 @@ export function getStatusBar(): PromptGuardStatusBar | null {
   return statusBar;
 }
 
-export function activate(context: vscode.ExtensionContext) {
-  console.log("PromptGuard extension is now active");
-
+export function activate(context: vscode.ExtensionContext): void {
   // Initialize CLI wrapper
   cli = new CliWrapper();
 
@@ -39,18 +37,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Update status bar on workspace changes (event-driven, not polling)
   const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    statusBar?.updateStatus();
+    void statusBar?.updateStatus();
   });
   context.subscriptions.push(workspaceWatcher);
 
   // Update status bar when files change (event-driven)
   const fileWatcher = vscode.workspace.onDidSaveTextDocument(() => {
-    statusBar?.updateStatus();
+    void statusBar?.updateStatus();
   });
   context.subscriptions.push(fileWatcher);
 
   // Initial status update
-  statusBar.updateStatus();
+  void statusBar.updateStatus();
 
   // Register commands - capture references to avoid null checks in closures
   const cliRef = cli;
@@ -71,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
   const configWatcher = vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("promptguard.cliPath")) {
       cli?.resetCache();
-      statusBar?.updateStatus();
+      void statusBar?.updateStatus();
     }
   });
   context.subscriptions.push(configWatcher);

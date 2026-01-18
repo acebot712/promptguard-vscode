@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
-import { ExtensionError } from "../types";
 
 export async function applyCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
   outputChannel.appendLine("PromptGuard: Apply Transformations");
@@ -32,10 +31,9 @@ export async function applyCommand(cli: CliWrapper, outputChannel: vscode.Output
       await statusBar.updateStatus();
     }
   } catch (error) {
-    const err = error instanceof ExtensionError ? error : new ExtensionError(String(error), undefined, error);
-    const message = err.message;
+    const message = error instanceof Error ? error.message : String(error);
     outputChannel.appendLine(`✗ Error: ${message}`);
-    vscode.window.showErrorMessage(`PromptGuard apply failed: ${message}`);
+    void vscode.window.showErrorMessage(`PromptGuard apply failed: ${message}`);
   }
 }
 

@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { ExtensionError } from "../types";
 
 export async function statusCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
   outputChannel.appendLine("PromptGuard: Status");
@@ -52,7 +51,7 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
       }
       
       outputChannel.appendLine(`  • Backup enabled: ${status.configuration.backup_enabled}`);
-      outputChannel.appendLine(`  • Backups: ${status.configuration.backups}`);
+      outputChannel.appendLine(`  • Backups: ${status.configuration.backups.length}`);
     }
 
     outputChannel.appendLine("\nView full dashboard: https://app.promptguard.co/dashboard");
@@ -63,10 +62,9 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
       :       "PromptGuard is disabled";
     vscode.window.showInformationMessage(message);
   } catch (error) {
-    const err = error instanceof ExtensionError ? error : new ExtensionError(String(error), undefined, error);
-    const message = err.message;
+    const message = error instanceof Error ? error.message : String(error);
     outputChannel.appendLine(`✗ Error: ${message}`);
-    vscode.window.showErrorMessage(`PromptGuard status failed: ${message}`);
+    void vscode.window.showErrorMessage(`PromptGuard status failed: ${message}`);
   }
 }
 

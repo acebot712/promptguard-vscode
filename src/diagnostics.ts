@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "./cli";
-import { ScanResult, ExtensionError } from "./types";
+import { ScanResult } from "./types";
 
 export class PromptGuardDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
@@ -14,18 +14,18 @@ export class PromptGuardDiagnostics {
 
   activate(context: vscode.ExtensionContext): void {
     // Run scan on workspace open
-    this.scanWorkspace();
+    void this.scanWorkspace();
 
     // Run scan on file save (TypeScript, JavaScript, Python)
     const fileWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
       if (this.isSupportedLanguage(document.languageId)) {
-        this.scanWorkspace();
+        void this.scanWorkspace();
       }
     });
 
     // Run scan when files are created/deleted
     const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      this.scanWorkspace();
+      void this.scanWorkspace();
     });
 
     this.disposables.push(fileWatcher, workspaceWatcher);
@@ -44,7 +44,7 @@ export class PromptGuardDiagnostics {
     try {
       const result = await this.cli.scan();
       this.updateDiagnostics(result);
-    } catch (error) {
+    } catch {
       // Silently fail - CLI might not be installed or project not initialized
       // Don't spam user with errors
       this.diagnosticCollection.clear();
@@ -58,14 +58,16 @@ export class PromptGuardDiagnostics {
       return;
     }
 
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      return;
+    }
+
     const diagnostics: Map<string, vscode.Diagnostic[]> = new Map();
 
     for (const provider of scanResult.providers) {
       for (const filePath of provider.files) {
-        const uri = vscode.Uri.joinPath(
-          vscode.workspace.workspaceFolders![0].uri,
-          filePath
-        );
+        const uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
 
         // Create a diagnostic at the start of the file
         // In a real implementation, we'd parse the file to find exact locations
@@ -78,10 +80,13 @@ export class PromptGuardDiagnostics {
         diagnostic.source = "PromptGuard";
         diagnostic.code = "llm-sdk-detected";
 
-        if (!diagnostics.has(uri.toString())) {
-          diagnostics.set(uri.toString(), []);
+        const uriString = uri.toString();
+        const existing = diagnostics.get(uriString);
+        if (existing) {
+          existing.push(diagnostic);
+        } else {
+          diagnostics.set(uriString, [diagnostic]);
         }
-        diagnostics.get(uri.toString())!.push(diagnostic);
       }
     }
 
@@ -94,7 +99,9 @@ export class PromptGuardDiagnostics {
 
   dispose(): void {
     this.diagnosticCollection.dispose();
-    this.disposables.forEach(d => d.dispose());
+    for (const d of this.disposables) {
+      d.dispose();
+    }
   }
 }
 

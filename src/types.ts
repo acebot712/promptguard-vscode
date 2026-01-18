@@ -28,24 +28,43 @@ export interface StatusResult {
     framework?: string;
     exclude_patterns: string[];
     cli_version?: string;
-    backups: number;
+    backups: string[];
   };
 }
 
-export interface CliError {
-  message: string;
-  code?: number;
-  stderr?: string;
-  stdout?: string;
+/**
+ * Error thrown when CLI command execution fails.
+ * Extends Error for proper error handling and stack traces.
+ */
+export class CliExecutionError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: number,
+    public readonly stderr?: string,
+    public readonly stdout?: string
+  ) {
+    super(message);
+    this.name = "CliExecutionError";
+    // Maintain proper stack trace in V8 environments
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, CliExecutionError);
+    }
+  }
 }
 
+/**
+ * Error thrown for extension-specific failures.
+ */
 export class ExtensionError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly originalError?: unknown
+    public readonly cause?: unknown
   ) {
     super(message);
     this.name = "ExtensionError";
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ExtensionError);
+    }
   }
 }

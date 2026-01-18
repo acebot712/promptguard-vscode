@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
-import { ExtensionError } from "../types";
 
 export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
   outputChannel.appendLine("PromptGuard: Initialize");
@@ -103,10 +102,9 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       await statusBar.updateStatus();
     }
   } catch (error) {
-    const err = error instanceof ExtensionError ? error : new ExtensionError(String(error), undefined, error);
-    const message = err.message;
+    const message = error instanceof Error ? error.message : String(error);
     outputChannel.appendLine(`✗ Error: ${message}`);
-    vscode.window.showErrorMessage(`PromptGuard initialization failed: ${message}`);
+    void vscode.window.showErrorMessage(`PromptGuard initialization failed: ${message}`);
   }
 }
 

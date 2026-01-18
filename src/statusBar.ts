@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "./cli";
-import { StatusResult, ExtensionError } from "./types";
+import { StatusResult } from "./types";
 
 export class PromptGuardStatusBar {
   private statusBarItem: vscode.StatusBarItem;
@@ -15,7 +15,7 @@ export class PromptGuardStatusBar {
     );
     this.statusBarItem.command = "promptguard.status";
     this.statusBarItem.tooltip = "Click to view PromptGuard status";
-    this.updateStatus();
+    void this.updateStatus();
   }
 
   async updateStatus(): Promise<void> {
@@ -23,7 +23,7 @@ export class PromptGuardStatusBar {
       const status = await this.cli.status();
       this.currentStatus = status;
       this.updateStatusBarItem(status);
-    } catch (error) {
+    } catch {
       // CLI not found or not initialized
       this.statusBarItem.text = "$(shield) PromptGuard: Not initialized";
       this.statusBarItem.tooltip = "Click to initialize PromptGuard";

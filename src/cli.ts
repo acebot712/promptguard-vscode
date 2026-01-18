@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import * as child_process from "child_process";
 import * as path from "path";
 import * as os from "os";
-import { ScanResult, StatusResult, CliError } from "./types";
+import { ScanResult, StatusResult, CliExecutionError } from "./types";
+
+/** Timeout for CLI commands in milliseconds (30 seconds) */
+const CLI_TIMEOUT_MS = 30000;
 
 export class CliWrapper {
   private cliPath: string | null = null;
@@ -54,9 +57,9 @@ export class CliWrapper {
 
   private async execSimple(cmd: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      child_process.execFile(cmd, args, (error, stdout) => {
+      child_process.execFile(cmd, args, { timeout: CLI_TIMEOUT_MS }, (error, stdout) => {
         if (error) {
-          reject(error);
+          reject(new Error(error.message));
           return;
         }
         resolve(stdout.trim());
@@ -98,14 +101,14 @@ export class CliWrapper {
     return new Promise((resolve, reject) => {
       // Use execFile instead of exec to prevent command injection
       // execFile passes arguments as an array, not through shell interpolation
-      child_process.execFile(cliPath, args, { cwd }, (error, stdout, stderr) => {
+      child_process.execFile(cliPath, args, { cwd, timeout: CLI_TIMEOUT_MS }, (error, stdout, stderr) => {
         if (error) {
-          reject({
-            message: `Command failed: promptguard ${args.join(" ")}`,
-            code: error.code,
-            stderr: stderr || error.message || "",
-            stdout: stdout || "",
-          } as CliError);
+          reject(new CliExecutionError(
+            `Command failed: promptguard ${args.join(" ")}`,
+            typeof error.code === "number" ? error.code : undefined,
+            stderr || error.message || "",
+            stdout || ""
+          ));
           return;
         }
         resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
@@ -122,16 +125,14 @@ export class CliWrapper {
     const { stdout, stderr } = await this.executeCommand(args);
     
     if (stderr && !stdout) {
-      throw { message: stderr } as CliError;
+      throw new CliExecutionError(stderr, undefined, stderr, stdout);
     }
 
     try {
       return JSON.parse(stdout) as ScanResult;
-    } catch (error) {
-      throw {
-        message: `Failed to parse scan output: ${error}`,
-        stderr,
-      } as CliError;
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new CliExecutionError(`Failed to parse scan output: ${errorMessage}`, undefined, stderr, stdout);
     }
   }
 
@@ -139,16 +140,14 @@ export class CliWrapper {
     const { stdout, stderr } = await this.executeCommand(["status", "--json"]);
 
     if (stderr && !stdout) {
-      throw { message: stderr } as CliError;
+      throw new CliExecutionError(stderr, undefined, stderr, stdout);
     }
 
     try {
       return JSON.parse(stdout) as StatusResult;
-    } catch (error) {
-      throw {
-        message: `Failed to parse status output: ${error}`,
-        stderr,
-      } as CliError;
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new CliExecutionError(`Failed to parse status output: ${errorMessage}`, undefined, stderr, stdout);
     }
   }
 
