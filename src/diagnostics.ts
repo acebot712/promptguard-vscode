@@ -6,6 +6,7 @@ export class PromptGuardDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
   private cli: CliWrapper;
   private disposables: vscode.Disposable[] = [];
+  private lastScanResult: ScanResult | null = null;
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
@@ -43,12 +44,20 @@ export class PromptGuardDiagnostics {
 
     try {
       const result = await this.cli.scan();
+      this.lastScanResult = result;
       this.updateDiagnostics(result);
     } catch {
       // Silently fail - CLI might not be installed or project not initialized
       // Don't spam user with errors
       this.diagnosticCollection.clear();
     }
+  }
+
+  /**
+   * Get the last scan result for use by other components (e.g., CodeActionProvider)
+   */
+  getLastScanResult(): ScanResult | null {
+    return this.lastScanResult;
   }
 
   private updateDiagnostics(scanResult: ScanResult): void {
@@ -66,26 +75,62 @@ export class PromptGuardDiagnostics {
     const diagnostics: Map<string, vscode.Diagnostic[]> = new Map();
 
     for (const provider of scanResult.providers) {
-      for (const filePath of provider.files) {
-        const uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      // Use detailed instance information if available (new CLI format)
+      if (provider.instances && provider.instances.length > 0) {
+        for (const instance of provider.instances) {
+          const uri = vscode.Uri.joinPath(workspaceFolder.uri, instance.file);
+          
+          // Use exact line/column from CLI's AST analysis
+          // CLI uses 1-based indexing, VS Code uses 0-based
+          const line = Math.max(0, instance.line - 1);
+          const column = Math.max(0, instance.column - 1);
+          
+          // Create a range that highlights the SDK constructor call
+          // We'll highlight from the column to the end of the line (approximate)
+          const range = new vscode.Range(line, column, line, column + 50);
 
-        // Create a diagnostic at the start of the file
-        // In a real implementation, we'd parse the file to find exact locations
-        // For MVP, we'll just show a warning at line 1
-        const diagnostic = new vscode.Diagnostic(
-          new vscode.Range(0, 0, 0, 100),
-          `${provider.name} SDK detected. Consider using PromptGuard for security.`,
-          vscode.DiagnosticSeverity.Information
-        );
-        diagnostic.source = "PromptGuard";
-        diagnostic.code = "llm-sdk-detected";
+          const hasProtection = instance.has_base_url;
+          const message = hasProtection
+            ? `${provider.name} SDK is already protected by PromptGuard.`
+            : `${provider.name} SDK detected. Run 'PromptGuard: Apply Transformations' to add security.`;
+          
+          const severity = hasProtection
+            ? vscode.DiagnosticSeverity.Hint
+            : vscode.DiagnosticSeverity.Information;
 
-        const uriString = uri.toString();
-        const existing = diagnostics.get(uriString);
-        if (existing) {
-          existing.push(diagnostic);
-        } else {
-          diagnostics.set(uriString, [diagnostic]);
+          const diagnostic = new vscode.Diagnostic(range, message, severity);
+          diagnostic.source = "PromptGuard";
+          diagnostic.code = hasProtection ? "llm-sdk-protected" : "llm-sdk-unprotected";
+
+          const uriString = uri.toString();
+          const existing = diagnostics.get(uriString);
+          if (existing) {
+            existing.push(diagnostic);
+          } else {
+            diagnostics.set(uriString, [diagnostic]);
+          }
+        }
+      } else {
+        // Fallback to old behavior if instances not available (older CLI)
+        for (const filePath of provider.files) {
+          const uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+
+          // Create a diagnostic at the start of the file (fallback)
+          const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(0, 0, 0, 100),
+            `${provider.name} SDK detected. Consider using PromptGuard for security.`,
+            vscode.DiagnosticSeverity.Information
+          );
+          diagnostic.source = "PromptGuard";
+          diagnostic.code = "llm-sdk-detected";
+
+          const uriString = uri.toString();
+          const existing = diagnostics.get(uriString);
+          if (existing) {
+            existing.push(diagnostic);
+          } else {
+            diagnostics.set(uriString, [diagnostic]);
+          }
         }
       }
     }

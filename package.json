@@ -2,7 +2,7 @@
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
   "description": "Plug-and-play LLM security for your AI applications",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {
@@ -34,6 +34,25 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "promptguard",
+          "title": "PromptGuard",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "promptguard": [
+        {
+          "id": "promptguard.managedFiles",
+          "name": "PromptGuard",
+          "icon": "$(shield)",
+          "contextualTitle": "PromptGuard"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "promptguard.init",
@@ -64,8 +83,60 @@
         "command": "promptguard.enable",
         "title": "PromptGuard: Enable",
         "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.scanSelection",
+        "title": "PromptGuard: Scan Selection for Threats",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.redactSelection",
+        "title": "PromptGuard: Redact PII from Selection",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.scanFile",
+        "title": "PromptGuard: Scan File for Threats",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.setApiKey",
+        "title": "PromptGuard: Set API Key",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.refreshTree",
+        "title": "PromptGuard: Refresh",
+        "category": "PromptGuard",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "promptguard.installCli",
+        "title": "PromptGuard: Install/Update CLI",
+        "category": "PromptGuard"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "promptguard.scanSelection",
+          "when": "editorHasSelection",
+          "group": "promptguard@1"
+        },
+        {
+          "command": "promptguard.redactSelection",
+          "when": "editorHasSelection",
+          "group": "promptguard@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "promptguard.scanFile",
+          "when": "resourceLangId == typescript || resourceLangId == javascript || resourceLangId == python",
+          "group": "promptguard@1"
+        }
+      ]
+    },
     "configuration": {
       "title": "PromptGuard",
       "properties": {
@@ -73,6 +144,12 @@
           "type": "string",
           "default": "",
           "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH."
+        },
+        "promptguard.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "PromptGuard API key. Stored securely in VS Code secrets.",
+          "markdownDescription": "PromptGuard API key. For security, this is stored in VS Code's secure secret storage."
         }
       }
     },

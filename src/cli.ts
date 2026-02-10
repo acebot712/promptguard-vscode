@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as child_process from "child_process";
 import * as path from "path";
 import * as os from "os";
-import { ScanResult, StatusResult, CliExecutionError } from "./types";
+import { ScanResult, StatusResult, SecurityScanResult, RedactResult, CliExecutionError } from "./types";
 
 /** Timeout for CLI commands in milliseconds (30 seconds) */
 const CLI_TIMEOUT_MS = 30000;
@@ -198,6 +198,48 @@ export class CliWrapper {
       args.push("--runtime");
     }
     await this.executeCommand(args);
+  }
+
+  /**
+   * Scan text for security threats via the backend API.
+   * Requires the project to be initialized with an API key.
+   */
+  async scanText(text: string): Promise<SecurityScanResult> {
+    // Use --text flag with the new CLI scan command
+    const args = ["scan", "--json", "--text", text];
+    const { stdout, stderr } = await this.executeCommand(args);
+
+    if (stderr && !stdout) {
+      throw new CliExecutionError(stderr, undefined, stderr, stdout);
+    }
+
+    try {
+      return JSON.parse(stdout) as SecurityScanResult;
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new CliExecutionError(`Failed to parse scan output: ${errorMessage}`, undefined, stderr, stdout);
+    }
+  }
+
+  /**
+   * Redact PII from text via the backend API.
+   * Requires the project to be initialized with an API key.
+   */
+  async redactText(text: string): Promise<RedactResult> {
+    // Use --text flag with the new CLI redact command
+    const args = ["redact", "--json", "--text", text];
+    const { stdout, stderr } = await this.executeCommand(args);
+
+    if (stderr && !stdout) {
+      throw new CliExecutionError(stderr, undefined, stderr, stdout);
+    }
+
+    try {
+      return JSON.parse(stdout) as RedactResult;
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      throw new CliExecutionError(`Failed to parse redact output: ${errorMessage}`, undefined, stderr, stdout);
+    }
   }
 
   resetCache(): void {

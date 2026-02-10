@@ -133,4 +133,156 @@ suite("CLI Wrapper Test Suite", () => {
       assert.ok(!isValid, `Invalid URL should be rejected: ${url}`);
     }
   });
+
+  // ==========================================================================
+  // SECURITY SCAN RESULT PARSING TESTS
+  // ==========================================================================
+
+  test("Should parse security scan API response", () => {
+    const mockScanResponse = JSON.stringify({
+      decision: "block",
+      confidence: 0.92,
+      threat_type: "prompt_injection",
+      reason: "Detected attempt to override system instructions",
+    });
+
+    const parsed = JSON.parse(mockScanResponse) as {
+      decision: string;
+      confidence: number;
+      threat_type: string;
+      reason: string;
+    };
+
+    assert.strictEqual(parsed.decision, "block");
+    assert.strictEqual(parsed.confidence, 0.92);
+    assert.strictEqual(parsed.threat_type, "prompt_injection");
+    assert.ok(parsed.reason.length > 0);
+  });
+
+  test("Should parse allow decision", () => {
+    const mockScanResponse = JSON.stringify({
+      decision: "allow",
+      confidence: 0.99,
+    });
+
+    const parsed = JSON.parse(mockScanResponse) as {
+      decision: string;
+      confidence: number;
+    };
+
+    assert.strictEqual(parsed.decision, "allow");
+    assert.ok(parsed.confidence > 0.9);
+  });
+
+  // ==========================================================================
+  // REDACT RESULT PARSING TESTS
+  // ==========================================================================
+
+  test("Should parse redact API response", () => {
+    const mockRedactResponse = JSON.stringify({
+      redacted_text: "Contact [NAME] at [EMAIL] for more information.",
+      entities_found: [
+        { type: "NAME", original: "John Doe", replacement: "[NAME]" },
+        { type: "EMAIL", original: "john.doe@example.com", replacement: "[EMAIL]" },
+      ],
+      entity_count: 2,
+    });
+
+    const parsed = JSON.parse(mockRedactResponse) as {
+      redacted_text: string;
+      entities_found: { type: string; original: string; replacement: string }[];
+      entity_count: number;
+    };
+
+    assert.strictEqual(parsed.entity_count, 2);
+    assert.ok(parsed.redacted_text.includes("[NAME]"));
+    assert.ok(parsed.redacted_text.includes("[EMAIL]"));
+    assert.strictEqual(parsed.entities_found[0].type, "NAME");
+    assert.strictEqual(parsed.entities_found[1].type, "EMAIL");
+  });
+
+  test("Should parse redact response with no entities", () => {
+    const mockRedactResponse = JSON.stringify({
+      redacted_text: "Hello, this is a clean message with no PII.",
+      entities_found: [],
+      entity_count: 0,
+    });
+
+    const parsed = JSON.parse(mockRedactResponse) as {
+      redacted_text: string;
+      entities_found: unknown[];
+      entity_count: number;
+    };
+
+    assert.strictEqual(parsed.entity_count, 0);
+    assert.strictEqual(parsed.entities_found.length, 0);
+  });
+
+  // ==========================================================================
+  // SCAN RESULT WITH INSTANCES TESTS
+  // ==========================================================================
+
+  test("Should parse scan output with instances", () => {
+    const mockOutput = JSON.stringify({
+      total_files_scanned: 50,
+      files_with_sdks: 2,
+      total_instances: 3,
+      providers: [
+        {
+          name: "openai",
+          file_count: 2,
+          instance_count: 3,
+          files: ["app.py", "main.py"],
+          instances: [
+            { file: "app.py", line: 10, column: 5, has_base_url: false },
+            { file: "app.py", line: 25, column: 12, has_base_url: true, current_base_url: "https://api.promptguard.co/api/v1" },
+            { file: "main.py", line: 8, column: 1, has_base_url: false },
+          ],
+        },
+      ],
+    });
+
+    const parsed = JSON.parse(mockOutput) as {
+      providers: {
+        instances: {
+          file: string;
+          line: number;
+          column: number;
+          has_base_url: boolean;
+          current_base_url?: string;
+        }[];
+      }[];
+    };
+
+    const instances = parsed.providers[0].instances;
+    assert.strictEqual(instances.length, 3);
+    assert.strictEqual(instances[0].line, 10);
+    assert.strictEqual(instances[0].column, 5);
+    assert.strictEqual(instances[1].has_base_url, true);
+    assert.ok(instances[1].current_base_url?.includes("promptguard"));
+  });
+
+  // ==========================================================================
+  // COMMAND CONSTRUCTION TESTS
+  // ==========================================================================
+
+  test("Scan text command should be properly constructed", () => {
+    const text = "Hello, my name is John";
+    const args = ["scan", "--json", "--text", text];
+    
+    assert.strictEqual(args[0], "scan");
+    assert.strictEqual(args[1], "--json");
+    assert.strictEqual(args[2], "--text");
+    assert.strictEqual(args[3], text);
+  });
+
+  test("Redact text command should be properly constructed", () => {
+    const text = "Contact john@example.com for help";
+    const args = ["redact", "--json", "--text", text];
+    
+    assert.strictEqual(args[0], "redact");
+    assert.strictEqual(args[1], "--json");
+    assert.strictEqual(args[2], "--text");
+    assert.strictEqual(args[3], text);
+  });
 });

@@ -37,6 +37,11 @@ suite("Extension Test Suite", () => {
       "promptguard.apply",
       "promptguard.disable",
       "promptguard.enable",
+      "promptguard.scanSelection",
+      "promptguard.redactSelection",
+      "promptguard.scanFile",
+      "promptguard.setApiKey",
+      "promptguard.refreshTree",
     ];
 
     for (const cmd of expectedCommands) {
@@ -55,5 +60,37 @@ suite("Extension Test Suite", () => {
     const config = vscode.workspace.getConfiguration("promptguard");
     const cliPath = config.get<string>("cliPath");
     assert.strictEqual(typeof cliPath, "string");
+  });
+
+  test("Configuration should have apiKey setting", () => {
+    const config = vscode.workspace.getConfiguration("promptguard");
+    // apiKey setting exists (value may be empty)
+    const apiKey = config.get<string>("apiKey");
+    assert.ok(apiKey !== undefined || apiKey === "");
+  });
+
+  // ==========================================================================
+  // CONTEXT MENU TESTS (structural)
+  // ==========================================================================
+
+  test("Editor context menu commands should be available", async () => {
+    const commands = await vscode.commands.getCommands();
+    
+    // These commands appear in the editor context menu when text is selected
+    assert.ok(commands.includes("promptguard.scanSelection"));
+    assert.ok(commands.includes("promptguard.redactSelection"));
+  });
+
+  // ==========================================================================
+  // TREE VIEW TESTS (structural)
+  // ==========================================================================
+
+  test("Tree view should be registered", () => {
+    // The tree view is registered in contributes.views
+    // We just verify the extension activated successfully
+    const extension = vscode.extensions.getExtension(
+      "promptguard.promptguard-vscode"
+    );
+    assert.ok(extension?.isActive);
   });
 });

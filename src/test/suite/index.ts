@@ -29,7 +29,7 @@ export async function run(): Promise<void> {
       });
     } catch (err) {
       console.error(err);
-      reject(err);
+      reject(err instanceof Error ? err : new Error(String(err)));
     }
   });
 }

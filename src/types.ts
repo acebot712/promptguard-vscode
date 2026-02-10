@@ -10,6 +10,15 @@ export interface ProviderResult {
   file_count: number;
   instance_count: number;
   files: string[];
+  instances?: SdkInstance[];
+}
+
+export interface SdkInstance {
+  file: string;
+  line: number;
+  column: number;
+  has_base_url: boolean;
+  current_base_url?: string;
 }
 
 export interface StatusResult {
@@ -30,6 +39,28 @@ export interface StatusResult {
     cli_version?: string;
     backups: string[];
   };
+}
+
+export interface SecurityScanResult {
+  decision: string;
+  confidence: number;
+  threat_type?: string;
+  reason?: string;
+  details?: unknown;
+}
+
+export interface RedactResult {
+  redacted_text: string;
+  entities_found: RedactedEntity[];
+  entity_count: number;
+}
+
+export interface RedactedEntity {
+  type: string;
+  original: string;
+  replacement: string;
+  start?: number;
+  end?: number;
 }
 
 /**
