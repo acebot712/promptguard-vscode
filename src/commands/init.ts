@@ -74,6 +74,7 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       { label: "HuggingFace", value: "huggingface" },
       { label: "Gemini (Google)", value: "gemini" },
       { label: "Groq", value: "groq" },
+      { label: "AWS Bedrock", value: "bedrock" },
     ];
 
     const selectedProviders = await vscode.window.showQuickPick(providerOptions, {

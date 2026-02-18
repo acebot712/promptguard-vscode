@@ -1,14 +1,18 @@
 # PromptGuard VS Code Extension
 
-Drop-in LLM security for your applications - directly in VS Code.
+Scan, detect, and secure LLM SDK usage in your codebase — directly in VS Code.
 
 ## Features
 
-- **LLM SDK Detection**: Automatically detects OpenAI, Anthropic, Cohere, and HuggingFace SDKs in your code
+- **LLM SDK Detection**: Automatically detects OpenAI, Anthropic, Cohere, HuggingFace, Gemini, Groq, and AWS Bedrock SDKs in your code
 - **Status Indicator**: See PromptGuard status at a glance in the status bar
 - **One-Click Setup**: Initialize PromptGuard with a single command
-- **Real-time Diagnostics**: Get warnings when LLM SDKs are detected
+- **Real-time Diagnostics**: Get warnings when LLM SDKs are detected without PromptGuard protection
+- **Security Scanning**: Scan selected text or files for prompt injection and PII
+- **PII Redaction**: Redact sensitive data from selected text
 - **CLI Integration**: Seamlessly wraps the PromptGuard CLI
+
+> **Tip:** For new projects, the [PromptGuard SDK](https://docs.promptguard.co/sdks/python) with auto-instrumentation (`promptguard.init()`) is the recommended integration — one line of code secures all LLM calls. The CLI and this extension are best for scanning existing codebases and applying proxy-mode transforms.
 
 ## Requirements
 
@@ -107,6 +111,7 @@ Click the status bar to view detailed status.
 - HuggingFace
 - Gemini (Google)
 - Groq
+- AWS Bedrock
 
 ## Troubleshooting
 

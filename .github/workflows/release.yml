@@ -83,7 +83,7 @@ jobs:
 
             ---
 
-            📖 **Documentation**: https://docs.promptguard.co/cli
+            📖 **Documentation**: https://docs.promptguard.co
             🏠 **Homepage**: https://promptguard.co
             🐛 **Issues**: https://github.com/promptguard/promptguard-vscode/issues
           files: '*.vsix'
