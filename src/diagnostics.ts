@@ -34,7 +34,9 @@ export class PromptGuardDiagnostics {
   }
 
   private isSupportedLanguage(languageId: string): boolean {
-    return ["typescript", "javascript", "python", "typescriptreact", "javascriptreact"].includes(languageId);
+    return ["typescript", "javascript", "python", "typescriptreact", "javascriptreact"].includes(
+      languageId,
+    );
   }
 
   private async scanWorkspace(): Promise<void> {
@@ -79,12 +81,12 @@ export class PromptGuardDiagnostics {
       if (provider.instances && provider.instances.length > 0) {
         for (const instance of provider.instances) {
           const uri = vscode.Uri.joinPath(workspaceFolder.uri, instance.file);
-          
+
           // Use exact line/column from CLI's AST analysis
           // CLI uses 1-based indexing, VS Code uses 0-based
           const line = Math.max(0, instance.line - 1);
           const column = Math.max(0, instance.column - 1);
-          
+
           // Create a range that highlights the SDK constructor call
           // We'll highlight from the column to the end of the line (approximate)
           const range = new vscode.Range(line, column, line, column + 50);
@@ -93,7 +95,7 @@ export class PromptGuardDiagnostics {
           const message = hasProtection
             ? `${provider.name} SDK is already protected by PromptGuard.`
             : `${provider.name} SDK detected. Run 'PromptGuard: Apply Transformations' to add security.`;
-          
+
           const severity = hasProtection
             ? vscode.DiagnosticSeverity.Hint
             : vscode.DiagnosticSeverity.Information;
@@ -119,7 +121,7 @@ export class PromptGuardDiagnostics {
           const diagnostic = new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 100),
             `${provider.name} SDK detected. Consider using PromptGuard for security.`,
-            vscode.DiagnosticSeverity.Information
+            vscode.DiagnosticSeverity.Information,
           );
           diagnostic.source = "PromptGuard";
           diagnostic.code = "llm-sdk-detected";
@@ -149,4 +151,3 @@ export class PromptGuardDiagnostics {
     }
   }
 }
-

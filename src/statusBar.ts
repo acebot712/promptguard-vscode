@@ -9,10 +9,7 @@ export class PromptGuardStatusBar {
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100
-    );
+    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     this.statusBarItem.command = "promptguard.status";
     this.statusBarItem.tooltip = "Click to view PromptGuard status";
     void this.updateStatus();
@@ -62,4 +59,3 @@ export class PromptGuardStatusBar {
     this.statusBarItem.dispose();
   }
 }
-

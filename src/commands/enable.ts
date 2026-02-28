@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
 
-export async function enableCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function enableCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Enable");
   outputChannel.show(true);
 
@@ -24,4 +27,3 @@ export async function enableCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     void vscode.window.showErrorMessage(`PromptGuard enable failed: ${message}`);
   }
 }
-

@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
 
-export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function initCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Initialize");
   outputChannel.show(true);
 
@@ -17,7 +20,7 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       {
         placeHolder: "Do you have a PromptGuard API key?",
         ignoreFocusOut: true,
-      }
+      },
     );
 
     if (!hasApiKey || hasApiKey.value === "cancel") {
@@ -28,7 +31,7 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       const openSignup = await vscode.window.showInformationMessage(
         "Open PromptGuard signup page?",
         "Open Browser",
-        "Cancel"
+        "Cancel",
       );
 
       if (openSignup === "Open Browser") {
@@ -44,7 +47,7 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
         {
           placeHolder: "Have you signed up and got your API key?",
           ignoreFocusOut: true,
-        }
+        },
       );
 
       if (!continueAfterSignup || continueAfterSignup.value === "cancel") {
@@ -82,9 +85,10 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
       canPickMany: true,
     });
 
-    const providers = selectedProviders && selectedProviders.length > 0
-      ? selectedProviders.map(p => p.value)
-      : undefined;
+    const providers =
+      selectedProviders && selectedProviders.length > 0
+        ? selectedProviders.map((p) => p.value)
+        : undefined;
 
     outputChannel.appendLine("Running: promptguard init...");
 
@@ -108,4 +112,3 @@ export async function initCommand(cli: CliWrapper, outputChannel: vscode.OutputC
     void vscode.window.showErrorMessage(`PromptGuard initialization failed: ${message}`);
   }
 }
-

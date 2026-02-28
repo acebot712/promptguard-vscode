@@ -29,12 +29,7 @@ suite("Secrets Test Suite", () => {
   });
 
   test("Invalid API key format detection", () => {
-    const invalidKeys = [
-      "other_key_123456789012345678901234",
-      "pg_123456789",
-      "randomstring",
-      "",
-    ];
+    const invalidKeys = ["other_key_123456789012345678901234", "pg_123456789", "randomstring", ""];
 
     for (const key of invalidKeys) {
       const isValid = key.startsWith("pg_sk_test_") || key.startsWith("pg_sk_prod_");

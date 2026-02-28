@@ -9,15 +9,11 @@ suite("Extension Test Suite", () => {
   // ==========================================================================
 
   test("Extension should be present", () => {
-    assert.ok(
-      vscode.extensions.getExtension("promptguard.promptguard-vscode")
-    );
+    assert.ok(vscode.extensions.getExtension("promptguard.promptguard-vscode"));
   });
 
   test("Extension should activate", async () => {
-    const extension = vscode.extensions.getExtension(
-      "promptguard.promptguard-vscode"
-    );
+    const extension = vscode.extensions.getExtension("promptguard.promptguard-vscode");
     if (extension) {
       await extension.activate();
       assert.strictEqual(extension.isActive, true);
@@ -45,10 +41,7 @@ suite("Extension Test Suite", () => {
     ];
 
     for (const cmd of expectedCommands) {
-      assert.ok(
-        commands.includes(cmd),
-        `Command ${cmd} should be registered`
-      );
+      assert.ok(commands.includes(cmd), `Command ${cmd} should be registered`);
     }
   });
 
@@ -75,7 +68,7 @@ suite("Extension Test Suite", () => {
 
   test("Editor context menu commands should be available", async () => {
     const commands = await vscode.commands.getCommands();
-    
+
     // These commands appear in the editor context menu when text is selected
     assert.ok(commands.includes("promptguard.scanSelection"));
     assert.ok(commands.includes("promptguard.redactSelection"));
@@ -88,9 +81,7 @@ suite("Extension Test Suite", () => {
   test("Tree view should be registered", () => {
     // The tree view is registered in contributes.views
     // We just verify the extension activated successfully
-    const extension = vscode.extensions.getExtension(
-      "promptguard.promptguard-vscode"
-    );
+    const extension = vscode.extensions.getExtension("promptguard.promptguard-vscode");
     assert.ok(extension?.isActive);
   });
 });

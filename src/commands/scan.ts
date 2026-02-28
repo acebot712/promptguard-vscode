@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 
-export async function scanCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function scanCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Scanning for LLM SDKs");
   outputChannel.show(true);
 
@@ -39,7 +42,7 @@ export async function scanCommand(cli: CliWrapper, outputChannel: vscode.OutputC
 
     outputChannel.appendLine("\n✓ Scan completed");
     vscode.window.showInformationMessage(
-      `Found ${result.providers.length} LLM provider(s) in ${result.files_with_sdks} file(s)`
+      `Found ${result.providers.length} LLM provider(s) in ${result.files_with_sdks} file(s)`,
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -47,4 +50,3 @@ export async function scanCommand(cli: CliWrapper, outputChannel: vscode.OutputC
     void vscode.window.showErrorMessage(`PromptGuard scan failed: ${message}`);
   }
 }
-

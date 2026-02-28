@@ -10,9 +10,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
   private cli: CliWrapper;
   private outputChannel: vscode.OutputChannel;
 
-  public static readonly providedCodeActionKinds = [
-    vscode.CodeActionKind.QuickFix,
-  ];
+  public static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
 
   constructor(cli: CliWrapper, outputChannel: vscode.OutputChannel) {
     this.cli = cli;
@@ -23,7 +21,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
     document: vscode.TextDocument,
     range: vscode.Range | vscode.Selection,
     context: vscode.CodeActionContext,
-    _token: vscode.CancellationToken
+    _token: vscode.CancellationToken,
   ): vscode.CodeAction[] {
     const actions: vscode.CodeAction[] = [];
 
@@ -38,7 +36,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
         // Create "Apply PromptGuard Protection" action
         const applyAction = new vscode.CodeAction(
           "Apply PromptGuard protection",
-          vscode.CodeActionKind.QuickFix
+          vscode.CodeActionKind.QuickFix,
         );
         applyAction.command = {
           command: "promptguard.apply",
@@ -51,7 +49,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
         // Create "Initialize PromptGuard" action if not yet initialized
         const initAction = new vscode.CodeAction(
           "Initialize PromptGuard in this project",
-          vscode.CodeActionKind.QuickFix
+          vscode.CodeActionKind.QuickFix,
         );
         initAction.command = {
           command: "promptguard.init",
@@ -63,7 +61,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
         // Create "Scan for Security Threats" action
         const scanAction = new vscode.CodeAction(
           "Scan file for security threats",
-          vscode.CodeActionKind.QuickFix
+          vscode.CodeActionKind.QuickFix,
         );
         scanAction.command = {
           command: "promptguard.scanFile",
@@ -85,7 +83,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
 export function registerCodeActionProvider(
   context: vscode.ExtensionContext,
   cli: CliWrapper,
-  outputChannel: vscode.OutputChannel
+  outputChannel: vscode.OutputChannel,
 ): void {
   const provider = new PromptGuardCodeActionProvider(cli, outputChannel);
 
@@ -98,13 +96,9 @@ export function registerCodeActionProvider(
   ];
 
   for (const selector of supportedLanguages) {
-    const registration = vscode.languages.registerCodeActionsProvider(
-      selector,
-      provider,
-      {
-        providedCodeActionKinds: PromptGuardCodeActionProvider.providedCodeActionKinds,
-      }
-    );
+    const registration = vscode.languages.registerCodeActionsProvider(selector, provider, {
+      providedCodeActionKinds: PromptGuardCodeActionProvider.providedCodeActionKinds,
+    });
     context.subscriptions.push(registration);
   }
 }

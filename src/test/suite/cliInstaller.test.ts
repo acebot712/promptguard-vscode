@@ -9,18 +9,12 @@ suite("CLI Installer Test Suite", () => {
 
   test("Platform should be detectable", () => {
     const platform = os.platform();
-    assert.ok(
-      ["darwin", "linux", "win32"].includes(platform),
-      `Detected platform: ${platform}`
-    );
+    assert.ok(["darwin", "linux", "win32"].includes(platform), `Detected platform: ${platform}`);
   });
 
   test("Architecture should be detectable", () => {
     const arch = os.arch();
-    assert.ok(
-      ["x64", "arm64", "ia32"].includes(arch),
-      `Detected architecture: ${arch}`
-    );
+    assert.ok(["x64", "arm64", "ia32"].includes(arch), `Detected architecture: ${arch}`);
   });
 
   // ==========================================================================
@@ -31,8 +25,12 @@ suite("CLI Installer Test Suite", () => {
     // Simulate asset mapping logic
     const getAssetName = (platform: string, arch: string): string | null => {
       if (platform === "darwin") {
-        if (arch === "arm64") {return "promptguard-macos-arm64";}
-        if (arch === "x64") {return "promptguard-macos-x86_64";}
+        if (arch === "arm64") {
+          return "promptguard-macos-arm64";
+        }
+        if (arch === "x64") {
+          return "promptguard-macos-x86_64";
+        }
       }
       return null;
     };
@@ -44,8 +42,12 @@ suite("CLI Installer Test Suite", () => {
   test("Linux x64 should map to correct asset", () => {
     const getAssetName = (platform: string, arch: string): string | null => {
       if (platform === "linux") {
-        if (arch === "x64") {return "promptguard-linux-x86_64";}
-        if (arch === "arm64") {return "promptguard-linux-arm64";}
+        if (arch === "x64") {
+          return "promptguard-linux-x86_64";
+        }
+        if (arch === "arm64") {
+          return "promptguard-linux-arm64";
+        }
       }
       return null;
     };
@@ -56,7 +58,9 @@ suite("CLI Installer Test Suite", () => {
 
   test("Windows should map to correct asset", () => {
     const getAssetName = (platform: string): string | null => {
-      if (platform === "win32") {return "promptguard-windows-x86_64.exe";}
+      if (platform === "win32") {
+        return "promptguard-windows-x86_64.exe";
+      }
       return null;
     };
 
@@ -81,7 +85,7 @@ suite("CLI Installer Test Suite", () => {
   test("Installation directory path should be constructable", () => {
     const mockStoragePath = "/Users/test/.vscode/extensions/promptguard";
     const binDir = path.join(mockStoragePath, "bin");
-    
+
     assert.ok(binDir.includes("bin"));
     assert.ok(binDir.includes("promptguard"));
   });
@@ -98,8 +102,12 @@ suite("CLI Installer Test Suite", () => {
       for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
         const l = latestParts[i] || 0;
         const c = currentParts[i] || 0;
-        if (l > c) {return true;}
-        if (l < c) {return false;}
+        if (l > c) {
+          return true;
+        }
+        if (l < c) {
+          return false;
+        }
       }
       return false;
     };
@@ -118,7 +126,7 @@ suite("CLI Installer Test Suite", () => {
 
   test("GitHub releases URL should be well-formed", () => {
     const releasesUrl = "https://api.github.com/repos/acebot712/promptguard-cli/releases/latest";
-    
+
     assert.ok(releasesUrl.startsWith("https://api.github.com"));
     assert.ok(releasesUrl.includes("releases/latest"));
   });
@@ -130,7 +138,7 @@ suite("CLI Installer Test Suite", () => {
   test("Executable permissions should be correct value", () => {
     // 0o755 = rwxr-xr-x
     const executablePermissions = 0o755;
-    
+
     assert.strictEqual(executablePermissions, 493); // Decimal representation
     assert.strictEqual(executablePermissions.toString(8), "755");
   });

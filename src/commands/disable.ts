@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
 
-export async function disableCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function disableCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Disable");
   outputChannel.show(true);
 
@@ -11,7 +14,7 @@ export async function disableCommand(cli: CliWrapper, outputChannel: vscode.Outp
       "This will temporarily disable PromptGuard. Continue?",
       { modal: true },
       "Yes",
-      "No"
+      "No",
     );
 
     if (confirm !== "Yes") {
@@ -36,4 +39,3 @@ export async function disableCommand(cli: CliWrapper, outputChannel: vscode.Outp
     void vscode.window.showErrorMessage(`PromptGuard disable failed: ${message}`);
   }
 }
-

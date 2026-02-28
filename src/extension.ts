@@ -29,10 +29,10 @@ export function getExtensionContext(): vscode.ExtensionContext | null {
 
 export function activate(context: vscode.ExtensionContext): void {
   extensionContext = context;
-  
+
   // Initialize secrets manager for secure API key storage
   initSecretsManager(context);
-  
+
   // Initialize CLI wrapper
   cli = new CliWrapper();
 
@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register commands - capture references to avoid null checks in closures
   const cliRef = cli;
   const outputRef = outputChannel;
-  
+
   const commands = [
     vscode.commands.registerCommand("promptguard.init", () => initCommand(cliRef, outputRef)),
     vscode.commands.registerCommand("promptguard.scan", () => scanCommand(cliRef, outputRef)),
@@ -84,15 +84,21 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("promptguard.apply", () => applyCommand(cliRef, outputRef)),
     vscode.commands.registerCommand("promptguard.disable", () => disableCommand(cliRef, outputRef)),
     vscode.commands.registerCommand("promptguard.enable", () => enableCommand(cliRef, outputRef)),
-    
+
     // New commands for scanning/redacting selected text
-    vscode.commands.registerCommand("promptguard.scanSelection", () => scanSelectionCommand(cliRef, outputRef)),
-    vscode.commands.registerCommand("promptguard.redactSelection", () => redactSelectionCommand(cliRef, outputRef)),
-    vscode.commands.registerCommand("promptguard.scanFile", (uri?: vscode.Uri) => scanFileCommand(cliRef, outputRef, uri)),
-    
+    vscode.commands.registerCommand("promptguard.scanSelection", () =>
+      scanSelectionCommand(cliRef, outputRef),
+    ),
+    vscode.commands.registerCommand("promptguard.redactSelection", () =>
+      redactSelectionCommand(cliRef, outputRef),
+    ),
+    vscode.commands.registerCommand("promptguard.scanFile", (uri?: vscode.Uri) =>
+      scanFileCommand(cliRef, outputRef, uri),
+    ),
+
     // API key management command
     vscode.commands.registerCommand("promptguard.setApiKey", () => setApiKeyCommand()),
-    
+
     // CLI installation command
     vscode.commands.registerCommand("promptguard.installCli", () => installCliCommand(outputRef)),
   ];
@@ -125,7 +131,9 @@ async function scanSelectionCommand(cli: CliWrapper, output: vscode.OutputChanne
   const selectedText = editor.document.getText(selection);
 
   if (!selectedText || selectedText.trim().length === 0) {
-    void vscode.window.showWarningMessage("No text selected. Select text to scan for security threats.");
+    void vscode.window.showWarningMessage(
+      "No text selected. Select text to scan for security threats.",
+    );
     return;
   }
 
@@ -144,12 +152,12 @@ async function scanSelectionCommand(cli: CliWrapper, output: vscode.OutputChanne
 
         // Use CLI to scan text
         const result = await cli.scanText(selectedText);
-        
+
         progress.report({ increment: 70, message: "Complete" });
-        
+
         output.appendLine(`Decision: ${result.decision}`);
         output.appendLine(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
-        
+
         if (result.threat_type) {
           output.appendLine(`Threat Type: ${result.threat_type}`);
         }
@@ -159,24 +167,29 @@ async function scanSelectionCommand(cli: CliWrapper, output: vscode.OutputChanne
 
         if (result.decision === "block") {
           void vscode.window.showWarningMessage(
-            `Security threat detected: ${result.threat_type || "Unknown"} (${(result.confidence * 100).toFixed(0)}% confidence)`
+            `Security threat detected: ${result.threat_type || "Unknown"} (${(result.confidence * 100).toFixed(0)}% confidence)`,
           );
         } else {
-          void vscode.window.showInformationMessage("No security threats detected in selected text.");
+          void vscode.window.showInformationMessage(
+            "No security threats detected in selected text.",
+          );
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         output.appendLine(`Error: ${message}`);
         void vscode.window.showErrorMessage(`Scan failed: ${message}`);
       }
-    }
+    },
   );
 }
 
 /**
  * Redact PII from selected text via the PromptGuard API.
  */
-async function redactSelectionCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
+async function redactSelectionCommand(
+  cli: CliWrapper,
+  output: vscode.OutputChannel,
+): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     void vscode.window.showWarningMessage("No active editor");
@@ -199,16 +212,18 @@ async function redactSelectionCommand(cli: CliWrapper, output: vscode.OutputChan
     },
     async (progress) => {
       try {
-        output.appendLine(`Redacting PII from selected text (${selectedText.length} characters)...`);
+        output.appendLine(
+          `Redacting PII from selected text (${selectedText.length} characters)...`,
+        );
         output.show();
 
         progress.report({ increment: 30, message: "Detecting sensitive data..." });
 
         // Use CLI to redact text
         const result = await cli.redactText(selectedText);
-        
+
         progress.report({ increment: 50, message: "Applying redactions..." });
-        
+
         output.appendLine(`Entities found: ${result.entity_count}`);
         for (const entity of result.entities_found) {
           output.appendLine(`  • ${entity.type}: ${entity.original} → ${entity.replacement}`);
@@ -219,26 +234,34 @@ async function redactSelectionCommand(cli: CliWrapper, output: vscode.OutputChan
           await editor.edit((editBuilder) => {
             editBuilder.replace(selection, result.redacted_text);
           });
-          
+
           progress.report({ increment: 20, message: "Complete" });
-          void vscode.window.showInformationMessage(`Redacted ${result.entity_count} sensitive entities.`);
+          void vscode.window.showInformationMessage(
+            `Redacted ${result.entity_count} sensitive entities.`,
+          );
         } else {
           progress.report({ increment: 20, message: "Complete" });
-          void vscode.window.showInformationMessage("No sensitive entities found in selected text.");
+          void vscode.window.showInformationMessage(
+            "No sensitive entities found in selected text.",
+          );
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         output.appendLine(`Error: ${message}`);
         void vscode.window.showErrorMessage(`Redaction failed: ${message}`);
       }
-    }
+    },
   );
 }
 
 /**
  * Scan a specific file for security threats.
  */
-async function scanFileCommand(cli: CliWrapper, output: vscode.OutputChannel, uri?: vscode.Uri): Promise<void> {
+async function scanFileCommand(
+  cli: CliWrapper,
+  output: vscode.OutputChannel,
+  uri?: vscode.Uri,
+): Promise<void> {
   const fileUri = uri || vscode.window.activeTextEditor?.document.uri;
   if (!fileUri) {
     void vscode.window.showWarningMessage("No file to scan");
@@ -266,15 +289,15 @@ async function scanFileCommand(cli: CliWrapper, output: vscode.OutputChannel, ur
 
         // Scan via CLI
         const result = await cli.scanText(content);
-        
+
         progress.report({ increment: 50, message: "Complete" });
-        
+
         output.appendLine(`Decision: ${result.decision}`);
         output.appendLine(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
 
         if (result.decision === "block") {
           void vscode.window.showWarningMessage(
-            `Security threat detected in file: ${result.threat_type || "Unknown"}`
+            `Security threat detected in file: ${result.threat_type || "Unknown"}`,
           );
         } else {
           void vscode.window.showInformationMessage("No security threats detected in file.");
@@ -284,7 +307,7 @@ async function scanFileCommand(cli: CliWrapper, output: vscode.OutputChannel, ur
         output.appendLine(`Error: ${message}`);
         void vscode.window.showErrorMessage(`File scan failed: ${message}`);
       }
-    }
+    },
   );
 }
 
@@ -316,12 +339,12 @@ async function checkCliInstallation(cli: CliWrapper, output: vscode.OutputChanne
     const installAction = "Install Now";
     const manualAction = "Install Manually";
     const configureAction = "Configure Path";
-    
+
     const result = await vscode.window.showWarningMessage(
       "PromptGuard CLI not found. Would you like to install it automatically?",
       installAction,
       manualAction,
-      configureAction
+      configureAction,
     );
 
     if (result === installAction) {
@@ -334,7 +357,9 @@ async function checkCliInstallation(cli: CliWrapper, output: vscode.OutputChanne
       // Open terminal and run install script
       const terminal = vscode.window.createTerminal("PromptGuard Install");
       terminal.show();
-      terminal.sendText("curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh");
+      terminal.sendText(
+        "curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh",
+      );
       output.appendLine("Opened terminal to install PromptGuard CLI");
     } else if (result === configureAction) {
       // Open settings to configure CLI path
@@ -354,13 +379,12 @@ async function installCliCommand(output: vscode.OutputChannel): Promise<void> {
   }
 
   const installed = isCliInstalled(context);
-  
+
   if (installed) {
-    const choice = await vscode.window.showQuickPick(
-      ["Reinstall CLI", "Cancel"],
-      { placeHolder: "PromptGuard CLI is already installed. What would you like to do?" }
-    );
-    
+    const choice = await vscode.window.showQuickPick(["Reinstall CLI", "Cancel"], {
+      placeHolder: "PromptGuard CLI is already installed. What would you like to do?",
+    });
+
     if (choice !== "Reinstall CLI") {
       return;
     }
@@ -380,13 +404,13 @@ async function setApiKeyCommand(): Promise<void> {
   try {
     const secrets = getSecretsManager();
     const existingKey = await secrets.getApiKey();
-    
+
     if (existingKey) {
       const choice = await vscode.window.showQuickPick(
         ["Update API key", "Delete API key", "Cancel"],
-        { placeHolder: "An API key is already stored. What would you like to do?" }
+        { placeHolder: "An API key is already stored. What would you like to do?" },
       );
-      
+
       if (choice === "Update API key") {
         await secrets.promptAndStoreApiKey();
       } else if (choice === "Delete API key") {
@@ -414,4 +438,3 @@ export function deactivate() {
   cli = null;
   outputChannel = null;
 }
-

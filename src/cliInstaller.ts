@@ -11,7 +11,8 @@ const chmod = promisify(fs.chmod);
 /**
  * GitHub releases URL for PromptGuard CLI
  */
-const GITHUB_RELEASES_URL = "https://api.github.com/repos/acebot712/promptguard-cli/releases/latest";
+const GITHUB_RELEASES_URL =
+  "https://api.github.com/repos/acebot712/promptguard-cli/releases/latest";
 
 /**
  * Mapping of platform/arch to release asset names
@@ -99,7 +100,7 @@ async function fetchLatestRelease(): Promise<GitHubRelease> {
 function handleResponse(
   res: typeof import("http").IncomingMessage.prototype,
   resolve: (value: GitHubRelease) => void,
-  reject: (reason: Error) => void
+  reject: (reason: Error) => void,
 ): void {
   let data = "";
   res.on("data", (chunk: string) => (data += chunk));
@@ -120,32 +121,38 @@ function handleResponse(
 async function downloadFile(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
-    
+
     const makeRequest = (downloadUrl: string) => {
-      https.get(downloadUrl, { headers: { "User-Agent": "PromptGuard-VSCode-Extension" } }, (response) => {
-        // Handle redirects
-        if (response.statusCode === 302 || response.statusCode === 301) {
-          const redirectUrl = response.headers.location;
-          if (redirectUrl) {
-            makeRequest(redirectUrl);
-            return;
-          }
-        }
+      https
+        .get(
+          downloadUrl,
+          { headers: { "User-Agent": "PromptGuard-VSCode-Extension" } },
+          (response) => {
+            // Handle redirects
+            if (response.statusCode === 302 || response.statusCode === 301) {
+              const redirectUrl = response.headers.location;
+              if (redirectUrl) {
+                makeRequest(redirectUrl);
+                return;
+              }
+            }
 
-        if (response.statusCode !== 200) {
-          reject(new Error(`Download failed with status ${response.statusCode}`));
-          return;
-        }
+            if (response.statusCode !== 200) {
+              reject(new Error(`Download failed with status ${response.statusCode}`));
+              return;
+            }
 
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          resolve();
+            response.pipe(file);
+            file.on("finish", () => {
+              file.close();
+              resolve();
+            });
+          },
+        )
+        .on("error", (err) => {
+          fs.unlink(destPath, () => {}); // Delete the file on error
+          reject(err);
         });
-      }).on("error", (err) => {
-        fs.unlink(destPath, () => {}); // Delete the file on error
-        reject(err);
-      });
     };
 
     makeRequest(url);
@@ -165,14 +172,14 @@ export function isCliInstalled(context: vscode.ExtensionContext): boolean {
  */
 export async function installCli(
   context: vscode.ExtensionContext,
-  output: vscode.OutputChannel
+  output: vscode.OutputChannel,
 ): Promise<string | null> {
   const assetName = getAssetName();
   if (!assetName) {
     output.appendLine(`Unsupported platform: ${os.platform()} ${os.arch()}`);
     void vscode.window.showErrorMessage(
       `PromptGuard CLI is not available for ${os.platform()} ${os.arch()}. ` +
-      "Please install manually from https://github.com/acebot712/promptguard-cli"
+        "Please install manually from https://github.com/acebot712/promptguard-cli",
     );
     return null;
   }
@@ -224,7 +231,7 @@ export async function installCli(
 
         output.appendLine("PromptGuard CLI installation complete!");
         void vscode.window.showInformationMessage(
-          `PromptGuard CLI ${release.tag_name} installed successfully!`
+          `PromptGuard CLI ${release.tag_name} installed successfully!`,
         );
 
         return destPath;
@@ -234,7 +241,7 @@ export async function installCli(
         void vscode.window.showErrorMessage(`Failed to install PromptGuard CLI: ${message}`);
         return null;
       }
-    }
+    },
   );
 }
 
@@ -244,7 +251,7 @@ export async function installCli(
 export async function checkForCliUpdates(
   context: vscode.ExtensionContext,
   output: vscode.OutputChannel,
-  currentVersion: string
+  currentVersion: string,
 ): Promise<void> {
   try {
     const release = await fetchLatestRelease();
@@ -255,7 +262,7 @@ export async function checkForCliUpdates(
       const update = await vscode.window.showInformationMessage(
         `PromptGuard CLI update available: ${release.tag_name} (current: ${currentVersion})`,
         "Update Now",
-        "Later"
+        "Later",
       );
 
       if (update === "Update Now") {
@@ -277,8 +284,12 @@ function isNewerVersion(latest: string, current: string): boolean {
   for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
     const l = latestParts[i] || 0;
     const c = currentParts[i] || 0;
-    if (l > c) {return true;}
-    if (l < c) {return false;}
+    if (l > c) {
+      return true;
+    }
+    if (l < c) {
+      return false;
+    }
   }
   return false;
 }

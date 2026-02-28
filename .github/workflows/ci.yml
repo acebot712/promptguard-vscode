@@ -26,6 +26,9 @@ jobs:
       - name: Lint TypeScript
         run: npm run lint
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Compile TypeScript
         run: npm run compile
 

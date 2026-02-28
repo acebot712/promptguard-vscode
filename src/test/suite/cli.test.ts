@@ -92,18 +92,11 @@ suite("CLI Wrapper Test Suite", () => {
     const validProdKey = "pg_sk_prod_live123456789012345678901234";
     const invalidKey = "sk_live_abc123";
 
+    assert.ok(validTestKey.startsWith("pg_sk_test_"), "Should accept test key format");
+    assert.ok(validProdKey.startsWith("pg_sk_prod_"), "Should accept prod key format");
     assert.ok(
-      validTestKey.startsWith("pg_sk_test_"),
-      "Should accept test key format"
-    );
-    assert.ok(
-      validProdKey.startsWith("pg_sk_prod_"),
-      "Should accept prod key format"
-    );
-    assert.ok(
-      !invalidKey.startsWith("pg_sk_test_") &&
-        !invalidKey.startsWith("pg_sk_prod_"),
-      "Should reject non-PromptGuard key formats"
+      !invalidKey.startsWith("pg_sk_test_") && !invalidKey.startsWith("pg_sk_prod_"),
+      "Should reject non-PromptGuard key formats",
     );
   });
 
@@ -235,7 +228,13 @@ suite("CLI Wrapper Test Suite", () => {
           files: ["app.py", "main.py"],
           instances: [
             { file: "app.py", line: 10, column: 5, has_base_url: false },
-            { file: "app.py", line: 25, column: 12, has_base_url: true, current_base_url: "https://api.promptguard.co/api/v1" },
+            {
+              file: "app.py",
+              line: 25,
+              column: 12,
+              has_base_url: true,
+              current_base_url: "https://api.promptguard.co/api/v1",
+            },
             { file: "main.py", line: 8, column: 1, has_base_url: false },
           ],
         },
@@ -269,7 +268,7 @@ suite("CLI Wrapper Test Suite", () => {
   test("Scan text command should be properly constructed", () => {
     const text = "Hello, my name is John";
     const args = ["scan", "--json", "--text", text];
-    
+
     assert.strictEqual(args[0], "scan");
     assert.strictEqual(args[1], "--json");
     assert.strictEqual(args[2], "--text");
@@ -279,7 +278,7 @@ suite("CLI Wrapper Test Suite", () => {
   test("Redact text command should be properly constructed", () => {
     const text = "Contact john@example.com for help";
     const args = ["redact", "--json", "--text", text];
-    
+
     assert.strictEqual(args[0], "redact");
     assert.strictEqual(args[1], "--json");
     assert.strictEqual(args[2], "--text");

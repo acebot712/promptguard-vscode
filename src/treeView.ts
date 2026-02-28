@@ -8,19 +8,17 @@ import { StatusResult } from "./types";
 class FileTreeItem extends vscode.TreeItem {
   constructor(
     public readonly filePath: string,
-    public readonly isProtected: boolean
+    public readonly isProtected: boolean,
   ) {
     super(filePath, vscode.TreeItemCollapsibleState.None);
-    
+
     this.tooltip = isProtected
       ? `${filePath} - Protected by PromptGuard`
       : `${filePath} - Not yet protected`;
-    
+
     this.iconPath = new vscode.ThemeIcon(
       isProtected ? "shield" : "warning",
-      isProtected
-        ? new vscode.ThemeColor("charts.green")
-        : new vscode.ThemeColor("charts.yellow")
+      isProtected ? new vscode.ThemeColor("charts.green") : new vscode.ThemeColor("charts.yellow"),
     );
 
     // Make files clickable to open them
@@ -39,7 +37,7 @@ class CategoryTreeItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly children: vscode.TreeItem[],
-    public readonly icon: string
+    public readonly icon: string,
   ) {
     super(label, vscode.TreeItemCollapsibleState.Expanded);
     this.iconPath = new vscode.ThemeIcon(icon);
@@ -53,7 +51,7 @@ class InfoTreeItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly value: string,
-    public readonly icon: string
+    public readonly icon: string,
   ) {
     super(`${label}: ${value}`, vscode.TreeItemCollapsibleState.None);
     this.iconPath = new vscode.ThemeIcon(icon);
@@ -112,24 +110,38 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
       const status = this.cachedStatus;
 
       // Status category
-      const statusIcon = status.status === "active" ? "check" : 
-                         status.status === "disabled" ? "circle-slash" : "question";
-      const statusLabel = status.status === "active" ? "Active" :
-                          status.status === "disabled" ? "Disabled" : "Not Initialized";
-      
-      const statusItems: vscode.TreeItem[] = [
-        new InfoTreeItem("Status", statusLabel, statusIcon),
-      ];
+      const statusIcon =
+        status.status === "active"
+          ? "check"
+          : status.status === "disabled"
+            ? "circle-slash"
+            : "question";
+      const statusLabel =
+        status.status === "active"
+          ? "Active"
+          : status.status === "disabled"
+            ? "Disabled"
+            : "Not Initialized";
+
+      const statusItems: vscode.TreeItem[] = [new InfoTreeItem("Status", statusLabel, statusIcon)];
 
       if (status.configuration) {
         statusItems.push(
-          new InfoTreeItem("Providers", status.configuration.providers.join(", ") || "None", "package"),
-          new InfoTreeItem("Files Managed", String(status.configuration.files_managed), "file-code"),
+          new InfoTreeItem(
+            "Providers",
+            status.configuration.providers.join(", ") || "None",
+            "package",
+          ),
+          new InfoTreeItem(
+            "Files Managed",
+            String(status.configuration.files_managed),
+            "file-code",
+          ),
         );
-        
+
         if (status.configuration.cli_version) {
           statusItems.push(
-            new InfoTreeItem("CLI Version", status.configuration.cli_version, "versions")
+            new InfoTreeItem("CLI Version", status.configuration.cli_version, "versions"),
           );
         }
       }
@@ -141,17 +153,13 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
         const fileItems = status.configuration.managed_files.map((file) => {
           return new FileTreeItem(file, true);
         });
-        
-        items.push(new CategoryTreeItem(
-          `Managed Files (${fileItems.length})`,
-          fileItems,
-          "files"
-        ));
+
+        items.push(new CategoryTreeItem(`Managed Files (${fileItems.length})`, fileItems, "files"));
       }
 
       // Quick actions
       const actionItems: vscode.TreeItem[] = [];
-      
+
       if (status.status === "not_initialized") {
         const initItem = new vscode.TreeItem("Initialize PromptGuard");
         initItem.command = { command: "promptguard.init", title: "Initialize" };
@@ -179,7 +187,6 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
       if (actionItems.length > 0) {
         items.push(new CategoryTreeItem("Actions", actionItems, "zap"));
       }
-
     } catch {
       // CLI not available or not initialized
       const notInitItem = new vscode.TreeItem("Not Initialized");
@@ -201,22 +208,22 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
  */
 export function registerTreeView(
   context: vscode.ExtensionContext,
-  cli: CliWrapper
+  cli: CliWrapper,
 ): PromptGuardTreeDataProvider {
   const treeDataProvider = new PromptGuardTreeDataProvider(cli);
-  
+
   const treeView = vscode.window.createTreeView("promptguard.managedFiles", {
     treeDataProvider,
     showCollapseAll: true,
   });
-  
+
   context.subscriptions.push(treeView);
 
   // Register refresh command
   context.subscriptions.push(
     vscode.commands.registerCommand("promptguard.refreshTree", () => {
       treeDataProvider.refresh();
-    })
+    }),
   );
 
   return treeDataProvider;

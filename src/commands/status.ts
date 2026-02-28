@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 
-export async function statusCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function statusCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Status");
   outputChannel.show(true);
 
@@ -15,16 +18,19 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     if (!status.initialized) {
       outputChannel.appendLine("Status: ⊘ Not initialized");
       outputChannel.appendLine("\nTo get started, run: PromptGuard: Initialize");
-      vscode.window.showInformationMessage("PromptGuard is not initialized. Run 'PromptGuard: Initialize' to get started.");
+      vscode.window.showInformationMessage(
+        "PromptGuard is not initialized. Run 'PromptGuard: Initialize' to get started.",
+      );
       return;
     }
 
     outputChannel.appendLine(`Status: ${status.status === "active" ? "✓ Active" : "⊘ Disabled"}`);
-    
+
     if (status.api_key) {
-      const masked = status.api_key.length > 8
-        ? `${status.api_key.substring(0, 4)}...${status.api_key.substring(status.api_key.length - 4)}`
-        : "***";
+      const masked =
+        status.api_key.length > 8
+          ? `${status.api_key.substring(0, 4)}...${status.api_key.substring(status.api_key.length - 4)}`
+          : "***";
       outputChannel.appendLine(`API Key: ${masked} (configured)`);
     }
 
@@ -35,21 +41,21 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     if (status.configuration) {
       outputChannel.appendLine("\nConfiguration:");
       outputChannel.appendLine(`  • Config file: ${status.configuration.config_file}`);
-      
+
       if (status.configuration.last_applied) {
         outputChannel.appendLine(`  • Last applied: ${status.configuration.last_applied}`);
       }
-      
+
       outputChannel.appendLine(`  • Files managed: ${status.configuration.files_managed}`);
-      
+
       if (status.configuration.providers && status.configuration.providers.length > 0) {
         outputChannel.appendLine(`  • Providers: ${status.configuration.providers.join(", ")}`);
       }
-      
+
       if (status.configuration.framework) {
         outputChannel.appendLine(`  • Framework: ${status.configuration.framework}`);
       }
-      
+
       outputChannel.appendLine(`  • Backup enabled: ${status.configuration.backup_enabled}`);
       outputChannel.appendLine(`  • Backups: ${status.configuration.backups.length}`);
     }
@@ -57,9 +63,8 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     outputChannel.appendLine("\nView full dashboard: https://app.promptguard.co/dashboard");
     outputChannel.appendLine("✓ Status retrieved successfully");
 
-    const message = status.status === "active"
-      ? "PromptGuard is active"
-      :       "PromptGuard is disabled";
+    const message =
+      status.status === "active" ? "PromptGuard is active" : "PromptGuard is disabled";
     vscode.window.showInformationMessage(message);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -67,4 +72,3 @@ export async function statusCommand(cli: CliWrapper, outputChannel: vscode.Outpu
     void vscode.window.showErrorMessage(`PromptGuard status failed: ${message}`);
   }
 }
-

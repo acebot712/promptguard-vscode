@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
 import { getStatusBar } from "../extension";
 
-export async function applyCommand(cli: CliWrapper, outputChannel: vscode.OutputChannel): Promise<void> {
+export async function applyCommand(
+  cli: CliWrapper,
+  outputChannel: vscode.OutputChannel,
+): Promise<void> {
   outputChannel.appendLine("PromptGuard: Apply Transformations");
   outputChannel.show(true);
 
@@ -11,7 +14,7 @@ export async function applyCommand(cli: CliWrapper, outputChannel: vscode.Output
       "This will apply PromptGuard transformations to your code. Continue?",
       { modal: true },
       "Yes",
-      "No"
+      "No",
     );
 
     if (confirm !== "Yes") {
@@ -36,4 +39,3 @@ export async function applyCommand(cli: CliWrapper, outputChannel: vscode.Output
     void vscode.window.showErrorMessage(`PromptGuard apply failed: ${message}`);
   }
 }
-

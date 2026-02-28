@@ -14,30 +14,15 @@ suite("Tree View Test Suite", () => {
   test("TreeItem should support collapsible state", () => {
     const collapsedItem = new vscode.TreeItem(
       "Collapsed",
-      vscode.TreeItemCollapsibleState.Collapsed
+      vscode.TreeItemCollapsibleState.Collapsed,
     );
-    assert.strictEqual(
-      collapsedItem.collapsibleState,
-      vscode.TreeItemCollapsibleState.Collapsed
-    );
+    assert.strictEqual(collapsedItem.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
 
-    const expandedItem = new vscode.TreeItem(
-      "Expanded",
-      vscode.TreeItemCollapsibleState.Expanded
-    );
-    assert.strictEqual(
-      expandedItem.collapsibleState,
-      vscode.TreeItemCollapsibleState.Expanded
-    );
+    const expandedItem = new vscode.TreeItem("Expanded", vscode.TreeItemCollapsibleState.Expanded);
+    assert.strictEqual(expandedItem.collapsibleState, vscode.TreeItemCollapsibleState.Expanded);
 
-    const noneItem = new vscode.TreeItem(
-      "None",
-      vscode.TreeItemCollapsibleState.None
-    );
-    assert.strictEqual(
-      noneItem.collapsibleState,
-      vscode.TreeItemCollapsibleState.None
-    );
+    const noneItem = new vscode.TreeItem("None", vscode.TreeItemCollapsibleState.None);
+    assert.strictEqual(noneItem.collapsibleState, vscode.TreeItemCollapsibleState.None);
   });
 
   test("TreeItem should support icons", () => {
@@ -113,10 +98,7 @@ suite("Tree View Test Suite", () => {
   // ==========================================================================
 
   test("File tree item structure", () => {
-    const fileItem = new vscode.TreeItem(
-      "app.py",
-      vscode.TreeItemCollapsibleState.None
-    );
+    const fileItem = new vscode.TreeItem("app.py", vscode.TreeItemCollapsibleState.None);
     fileItem.resourceUri = vscode.Uri.file("/workspace/app.py");
     fileItem.iconPath = new vscode.ThemeIcon("file");
     fileItem.description = "OpenAI SDK detected";
@@ -131,30 +113,21 @@ suite("Tree View Test Suite", () => {
   test("Category tree item structure", () => {
     const categoryItem = new vscode.TreeItem(
       "Managed Files",
-      vscode.TreeItemCollapsibleState.Expanded
+      vscode.TreeItemCollapsibleState.Expanded,
     );
     categoryItem.iconPath = new vscode.ThemeIcon("files");
     categoryItem.description = "3 files";
 
     assert.strictEqual(categoryItem.label, "Managed Files");
-    assert.strictEqual(
-      categoryItem.collapsibleState,
-      vscode.TreeItemCollapsibleState.Expanded
-    );
+    assert.strictEqual(categoryItem.collapsibleState, vscode.TreeItemCollapsibleState.Expanded);
   });
 
   test("Info tree item structure", () => {
-    const infoItem = new vscode.TreeItem(
-      "Status: Protected",
-      vscode.TreeItemCollapsibleState.None
-    );
+    const infoItem = new vscode.TreeItem("Status: Protected", vscode.TreeItemCollapsibleState.None);
     infoItem.iconPath = new vscode.ThemeIcon("check");
 
     assert.strictEqual(infoItem.label, "Status: Protected");
-    assert.strictEqual(
-      infoItem.collapsibleState,
-      vscode.TreeItemCollapsibleState.None
-    );
+    assert.strictEqual(infoItem.collapsibleState, vscode.TreeItemCollapsibleState.None);
   });
 
   // ==========================================================================

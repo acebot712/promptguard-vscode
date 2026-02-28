@@ -72,7 +72,7 @@ export class CliExecutionError extends Error {
     message: string,
     public readonly code?: number,
     public readonly stderr?: string,
-    public readonly stdout?: string
+    public readonly stdout?: string,
   ) {
     super(message);
     this.name = "CliExecutionError";
@@ -90,7 +90,7 @@ export class ExtensionError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly cause?: unknown
+    public readonly cause?: unknown,
   ) {
     super(message);
     this.name = "ExtensionError";

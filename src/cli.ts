@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 import * as child_process from "child_process";
 import * as path from "path";
 import * as os from "os";
-import { ScanResult, StatusResult, SecurityScanResult, RedactResult, CliExecutionError } from "./types";
+import {
+  ScanResult,
+  StatusResult,
+  SecurityScanResult,
+  RedactResult,
+  CliExecutionError,
+} from "./types";
 
 /** Timeout for CLI commands in milliseconds (30 seconds) */
 const CLI_TIMEOUT_MS = 30000;
@@ -24,7 +30,7 @@ export class CliWrapper {
     try {
       const whichCmd = process.platform === "win32" ? "where" : "which";
       const foundPath = await this.execSimple(whichCmd, ["promptguard"]);
-      if (foundPath && await this.isValidBinary(foundPath)) {
+      if (foundPath && (await this.isValidBinary(foundPath))) {
         return foundPath;
       }
     } catch {
@@ -41,8 +47,12 @@ export class CliWrapper {
     // Add Windows paths if on Windows
     if (process.platform === "win32") {
       commonPaths.push(
-        path.join(process.env["ProgramFiles"] || "C:\\Program Files", "PromptGuard", "promptguard.exe"),
-        path.join(process.env["LOCALAPPDATA"] || "", "PromptGuard", "promptguard.exe")
+        path.join(
+          process.env["ProgramFiles"] || "C:\\Program Files",
+          "PromptGuard",
+          "promptguard.exe",
+        ),
+        path.join(process.env["LOCALAPPDATA"] || "", "PromptGuard", "promptguard.exe"),
       );
     }
 
@@ -85,8 +95,8 @@ export class CliWrapper {
     if (!path) {
       throw new Error(
         "PromptGuard CLI not found. Please install it first:\n" +
-        "  curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh\n\n" +
-        "Or set the 'promptguard.cliPath' setting to the binary location."
+          "  curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh\n\n" +
+          "Or set the 'promptguard.cliPath' setting to the binary location.",
       );
     }
 
@@ -101,18 +111,25 @@ export class CliWrapper {
     return new Promise((resolve, reject) => {
       // Use execFile instead of exec to prevent command injection
       // execFile passes arguments as an array, not through shell interpolation
-      child_process.execFile(cliPath, args, { cwd, timeout: CLI_TIMEOUT_MS }, (error, stdout, stderr) => {
-        if (error) {
-          reject(new CliExecutionError(
-            `Command failed: promptguard ${args.join(" ")}`,
-            typeof error.code === "number" ? error.code : undefined,
-            stderr || error.message || "",
-            stdout || ""
-          ));
-          return;
-        }
-        resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
-      });
+      child_process.execFile(
+        cliPath,
+        args,
+        { cwd, timeout: CLI_TIMEOUT_MS },
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(
+              new CliExecutionError(
+                `Command failed: promptguard ${args.join(" ")}`,
+                typeof error.code === "number" ? error.code : undefined,
+                stderr || error.message || "",
+                stdout || "",
+              ),
+            );
+            return;
+          }
+          resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+        },
+      );
     });
   }
 
@@ -123,7 +140,7 @@ export class CliWrapper {
     }
 
     const { stdout, stderr } = await this.executeCommand(args);
-    
+
     if (stderr && !stdout) {
       throw new CliExecutionError(stderr, undefined, stderr, stdout);
     }
@@ -132,7 +149,12 @@ export class CliWrapper {
       return JSON.parse(stdout) as ScanResult;
     } catch (parseError) {
       const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(`Failed to parse scan output: ${errorMessage}`, undefined, stderr, stdout);
+      throw new CliExecutionError(
+        `Failed to parse scan output: ${errorMessage}`,
+        undefined,
+        stderr,
+        stdout,
+      );
     }
   }
 
@@ -147,7 +169,12 @@ export class CliWrapper {
       return JSON.parse(stdout) as StatusResult;
     } catch (parseError) {
       const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(`Failed to parse status output: ${errorMessage}`, undefined, stderr, stdout);
+      throw new CliExecutionError(
+        `Failed to parse status output: ${errorMessage}`,
+        undefined,
+        stderr,
+        stdout,
+      );
     }
   }
 
@@ -158,21 +185,21 @@ export class CliWrapper {
     auto?: boolean;
   }): Promise<void> {
     const args = ["init"];
-    
+
     if (options.apiKey) {
       args.push("--api-key", options.apiKey);
     }
-    
+
     if (options.provider && options.provider.length > 0) {
       for (const p of options.provider) {
         args.push("--provider", p);
       }
     }
-    
+
     if (options.baseUrl) {
       args.push("--base-url", options.baseUrl);
     }
-    
+
     if (options.auto) {
       args.push("--auto");
     }
@@ -217,7 +244,12 @@ export class CliWrapper {
       return JSON.parse(stdout) as SecurityScanResult;
     } catch (parseError) {
       const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(`Failed to parse scan output: ${errorMessage}`, undefined, stderr, stdout);
+      throw new CliExecutionError(
+        `Failed to parse scan output: ${errorMessage}`,
+        undefined,
+        stderr,
+        stdout,
+      );
     }
   }
 
@@ -238,7 +270,12 @@ export class CliWrapper {
       return JSON.parse(stdout) as RedactResult;
     } catch (parseError) {
       const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(`Failed to parse redact output: ${errorMessage}`, undefined, stderr, stdout);
+      throw new CliExecutionError(
+        `Failed to parse redact output: ${errorMessage}`,
+        undefined,
+        stderr,
+        stdout,
+      );
     }
   }
 
@@ -246,4 +283,3 @@ export class CliWrapper {
     this.cliPath = null;
   }
 }
-
