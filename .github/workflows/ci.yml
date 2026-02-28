@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   test:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -29,22 +29,18 @@ jobs:
       - name: Compile TypeScript
         run: npm run compile
 
-      - name: Check for build errors
+      - name: Verify build output
         run: |
           if [ ! -f "out/extension.js" ]; then
             echo "Error: extension.js not found after compilation"
             exit 1
           fi
-          echo "✓ Build successful"
 
       - name: Run Tests
         run: xvfb-run -a npm test
         if: runner.os == 'Linux'
 
-      - name: Validate package.json
+      - name: Package extension
         run: |
-          npm run vscode:prepublish || true
-          if [ ! -f "*.vsix" ]; then
-            echo "Warning: VSIX package not created (this is expected in CI)"
-          fi
-
+          npm install -g @vscode/vsce
+          vsce package --no-dependencies
