@@ -2,7 +2,7 @@
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
   "description": "Plug-and-play LLM security for your AI applications",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {
