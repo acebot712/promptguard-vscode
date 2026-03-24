@@ -1,7 +1,6 @@
 import * as assert from "assert";
 import {
   CliExecutionError,
-  ExtensionError,
   ScanResult,
   ProviderResult,
   SdkInstance,
@@ -138,15 +137,5 @@ suite("Types Test Suite", () => {
     assert.strictEqual(error.name, "CliExecutionError");
     assert.strictEqual(error.code, 1);
     assert.strictEqual(error.stderr, "error output");
-  });
-
-  test("ExtensionError should have code and cause", () => {
-    const cause = new Error("Original error");
-    const error = new ExtensionError("Extension error", "ERR_001", cause);
-
-    assert.ok(error instanceof Error);
-    assert.strictEqual(error.name, "ExtensionError");
-    assert.strictEqual(error.code, "ERR_001");
-    assert.strictEqual(error.cause, cause);
   });
 });

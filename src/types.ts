@@ -82,20 +82,3 @@ export class CliExecutionError extends Error {
     }
   }
 }
-
-/**
- * Error thrown for extension-specific failures.
- */
-export class ExtensionError extends Error {
-  constructor(
-    message: string,
-    public readonly code?: string,
-    public readonly cause?: unknown,
-  ) {
-    super(message);
-    this.name = "ExtensionError";
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ExtensionError);
-    }
-  }
-}

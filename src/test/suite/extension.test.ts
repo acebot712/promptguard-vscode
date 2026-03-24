@@ -55,13 +55,6 @@ suite("Extension Test Suite", () => {
     assert.strictEqual(typeof cliPath, "string");
   });
 
-  test("Configuration should have apiKey setting", () => {
-    const config = vscode.workspace.getConfiguration("promptguard");
-    // apiKey setting exists (value may be empty)
-    const apiKey = config.get<string>("apiKey");
-    assert.ok(apiKey !== undefined || apiKey === "");
-  });
-
   // ==========================================================================
   // CONTEXT MENU TESTS (structural)
   // ==========================================================================

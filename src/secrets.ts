@@ -36,14 +36,6 @@ export class SecretsManager {
   }
 
   /**
-   * Check if an API key is stored.
-   */
-  async hasApiKey(): Promise<boolean> {
-    const key = await this.getApiKey();
-    return key !== undefined && key.length > 0;
-  }
-
-  /**
    * Prompt user for API key and store it securely.
    * Returns the API key if successful, undefined if cancelled.
    */
