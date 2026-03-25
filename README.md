@@ -1,6 +1,6 @@
 # PromptGuard VS Code Extension
 
-Scan, detect, and secure LLM SDK usage in your codebase — directly in VS Code.
+Scan, detect, and secure LLM SDK usage in your codebase - directly in VS Code.
 
 ## Features
 
@@ -12,7 +12,7 @@ Scan, detect, and secure LLM SDK usage in your codebase — directly in VS Code.
 - **PII Redaction**: Redact sensitive data from selected text
 - **CLI Integration**: Seamlessly wraps the PromptGuard CLI
 
-> **Tip:** For new projects, the [PromptGuard SDK](https://docs.promptguard.co/sdks/python) with auto-instrumentation (`promptguard.init()`) is the recommended integration — one line of code secures all LLM calls. The CLI and this extension are best for scanning existing codebases and applying proxy-mode transforms.
+> **Tip:** For new projects, the [PromptGuard SDK](https://docs.promptguard.co/sdks/python) with auto-instrumentation (`promptguard.init()`) is the recommended integration - one line of code secures all LLM calls. The CLI and this extension are best for scanning existing codebases and applying proxy-mode transforms.
 
 ## Requirements
 
