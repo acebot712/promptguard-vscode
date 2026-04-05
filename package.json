@@ -188,16 +188,16 @@
     "@eslint/js": "^9.39.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.80.0",
-    "@typescript-eslint/eslint-plugin": "^8.53.0",
-    "@typescript-eslint/parser": "^8.53.0",
+    "@types/vscode": "^1.110.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.2",
-    "glob": "^13.0.0",
+    "glob": "^13.0.6",
     "mocha": "^11.7.5",
     "prettier": "^3.8.1",
     "typescript": "^5.0.0",
-    "typescript-eslint": "^8.53.0"
+    "typescript-eslint": "^8.58.0"
   },
   "repository": {
     "type": "git",
