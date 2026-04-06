@@ -5,7 +5,6 @@ import { StatusResult } from "./types";
 export class PromptGuardStatusBar {
   private statusBarItem: vscode.StatusBarItem;
   private cli: CliWrapper;
-  private currentStatus: StatusResult | null = null;
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
@@ -18,10 +17,8 @@ export class PromptGuardStatusBar {
   async updateStatus(): Promise<void> {
     try {
       const status = await this.cli.status();
-      this.currentStatus = status;
       this.updateStatusBarItem(status);
     } catch {
-      // CLI not found or not initialized
       this.statusBarItem.text = "$(shield) PromptGuard: Not initialized";
       this.statusBarItem.tooltip = "Click to initialize PromptGuard";
       this.statusBarItem.backgroundColor = undefined;
@@ -49,10 +46,6 @@ export class PromptGuardStatusBar {
     }
 
     this.statusBarItem.show();
-  }
-
-  getCurrentStatus(): StatusResult | null {
-    return this.currentStatus;
   }
 
   dispose(): void {

@@ -1,29 +1,20 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { getStatusBar } from "../extension";
+import { errorMessage } from "../utils";
 
-export async function enableCommand(
-  cli: CliWrapper,
-  outputChannel: vscode.OutputChannel,
-): Promise<void> {
-  outputChannel.appendLine("PromptGuard: Enable");
-  outputChannel.show(true);
+export async function enableCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
+  output.appendLine("PromptGuard: Enable");
+  output.show(true);
 
   try {
-    outputChannel.appendLine("Running: promptguard enable...");
+    output.appendLine("Running: promptguard enable...");
     await cli.enable();
 
-    outputChannel.appendLine("✓ PromptGuard enabled");
-    vscode.window.showInformationMessage("PromptGuard enabled");
-
-    // Refresh status
-    const statusBar = getStatusBar();
-    if (statusBar) {
-      await statusBar.updateStatus();
-    }
+    output.appendLine("✓ PromptGuard enabled");
+    void vscode.window.showInformationMessage("PromptGuard enabled");
+    void vscode.commands.executeCommand("promptguard.refreshUI");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outputChannel.appendLine(`✗ Error: ${message}`);
-    void vscode.window.showErrorMessage(`PromptGuard enable failed: ${message}`);
+    output.appendLine(`✗ Error: ${errorMessage(error)}`);
+    void vscode.window.showErrorMessage(`PromptGuard enable failed: ${errorMessage(error)}`);
   }
 }

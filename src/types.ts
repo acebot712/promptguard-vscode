@@ -41,7 +41,7 @@ export interface StatusResult {
   };
 }
 
-export interface SecurityScanResult {
+export interface ThreatDetectionResult {
   decision: string;
   confidence: number;
   threat_type?: string;
@@ -63,10 +63,6 @@ export interface RedactedEntity {
   end?: number;
 }
 
-/**
- * Error thrown when CLI command execution fails.
- * Extends Error for proper error handling and stack traces.
- */
 export class CliExecutionError extends Error {
   constructor(
     message: string,
@@ -76,7 +72,6 @@ export class CliExecutionError extends Error {
   ) {
     super(message);
     this.name = "CliExecutionError";
-    // Maintain proper stack trace in V8 environments
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, CliExecutionError);
     }

@@ -1,52 +1,49 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
+import { errorMessage } from "../utils";
 
-export async function scanCommand(
-  cli: CliWrapper,
-  outputChannel: vscode.OutputChannel,
-): Promise<void> {
-  outputChannel.appendLine("PromptGuard: Scanning for LLM SDKs");
-  outputChannel.show(true);
+export async function scanCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
+  output.appendLine("PromptGuard: Scanning for LLM SDKs");
+  output.show(true);
 
   try {
-    outputChannel.appendLine("Running: promptguard scan...");
+    output.appendLine("Running: promptguard scan...");
     const result = await cli.scan();
 
-    outputChannel.appendLine("\n📊 LLM SDK Detection Report");
-    outputChannel.appendLine("─".repeat(50));
-    outputChannel.appendLine(`Total files scanned: ${result.total_files_scanned}`);
-    outputChannel.appendLine(`Files with SDKs: ${result.files_with_sdks}`);
-    outputChannel.appendLine(`Total instances: ${result.total_instances}`);
+    output.appendLine("\n📊 LLM SDK Detection Report");
+    output.appendLine("─".repeat(50));
+    output.appendLine(`Total files scanned: ${result.total_files_scanned}`);
+    output.appendLine(`Files with SDKs: ${result.files_with_sdks}`);
+    output.appendLine(`Total instances: ${result.total_instances}`);
 
     if (result.providers.length === 0) {
-      outputChannel.appendLine("\nNo LLM SDKs detected.");
-      vscode.window.showInformationMessage("No LLM SDKs detected in this project");
+      output.appendLine("\nNo LLM SDKs detected.");
+      void vscode.window.showInformationMessage("No LLM SDKs detected in this project");
       return;
     }
 
-    outputChannel.appendLine("\nProviders detected:");
+    output.appendLine("\nProviders detected:");
     for (const provider of result.providers) {
-      outputChannel.appendLine(`\n  • ${provider.name} SDK`);
-      outputChannel.appendLine(`    Files: ${provider.file_count}`);
-      outputChannel.appendLine(`    Instances: ${provider.instance_count}`);
+      output.appendLine(`\n  • ${provider.name} SDK`);
+      output.appendLine(`    Files: ${provider.file_count}`);
+      output.appendLine(`    Instances: ${provider.instance_count}`);
       if (provider.files.length > 0) {
-        outputChannel.appendLine(`    Files:`);
+        output.appendLine(`    Files:`);
         for (const file of provider.files.slice(0, 10)) {
-          outputChannel.appendLine(`      - ${file}`);
+          output.appendLine(`      - ${file}`);
         }
         if (provider.files.length > 10) {
-          outputChannel.appendLine(`      ... and ${provider.files.length - 10} more`);
+          output.appendLine(`      ... and ${provider.files.length - 10} more`);
         }
       }
     }
 
-    outputChannel.appendLine("\n✓ Scan completed");
-    vscode.window.showInformationMessage(
+    output.appendLine("\n✓ Scan completed");
+    void vscode.window.showInformationMessage(
       `Found ${result.providers.length} LLM provider(s) in ${result.files_with_sdks} file(s)`,
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outputChannel.appendLine(`✗ Error: ${message}`);
-    void vscode.window.showErrorMessage(`PromptGuard scan failed: ${message}`);
+    output.appendLine(`✗ Error: ${errorMessage(error)}`);
+    void vscode.window.showErrorMessage(`PromptGuard scan failed: ${errorMessage(error)}`);
   }
 }

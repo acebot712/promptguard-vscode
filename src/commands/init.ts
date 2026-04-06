@@ -1,74 +1,93 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { getStatusBar } from "../extension";
+import { SecretsManager } from "../secrets";
+import { errorMessage } from "../utils";
 
 export async function initCommand(
   cli: CliWrapper,
-  outputChannel: vscode.OutputChannel,
+  output: vscode.OutputChannel,
+  secrets: SecretsManager,
 ): Promise<void> {
-  outputChannel.appendLine("PromptGuard: Initialize");
-  outputChannel.show(true);
+  output.appendLine("PromptGuard: Initialize");
+  output.show(true);
 
   try {
-    // Check if user has API key, offer signup if not
-    const hasApiKey = await vscode.window.showQuickPick(
-      [
-        { label: "I have an API key", value: "has_key" },
-        { label: "Sign up / Get API key", value: "signup" },
-        { label: "Cancel", value: "cancel" },
-      ],
-      {
-        placeHolder: "Do you have a PromptGuard API key?",
-        ignoreFocusOut: true,
-      },
-    );
+    let apiKey: string | undefined;
 
-    if (!hasApiKey || hasApiKey.value === "cancel") {
-      return;
-    }
-
-    if (hasApiKey.value === "signup") {
-      const openSignup = await vscode.window.showInformationMessage(
-        "Open PromptGuard signup page?",
-        "Open Browser",
-        "Cancel",
-      );
-
-      if (openSignup === "Open Browser") {
-        vscode.env.openExternal(vscode.Uri.parse("https://app.promptguard.co/signup"));
-      }
-
-      // After opening browser, ask if they want to continue
-      const continueAfterSignup = await vscode.window.showQuickPick(
+    const existingKey = await secrets.getApiKey();
+    if (existingKey) {
+      const choice = await vscode.window.showQuickPick(
         [
-          { label: "I have my API key now", value: "continue" },
+          { label: "Use stored API key", value: "use_stored" },
+          { label: "Enter a new API key", value: "new_key" },
           { label: "Cancel", value: "cancel" },
         ],
         {
-          placeHolder: "Have you signed up and got your API key?",
+          placeHolder: "A PromptGuard API key is already stored.",
           ignoreFocusOut: true,
         },
       );
 
-      if (!continueAfterSignup || continueAfterSignup.value === "cancel") {
+      if (!choice || choice.value === "cancel") {
+        return;
+      }
+
+      if (choice.value === "use_stored") {
+        apiKey = existingKey;
+      }
+    }
+
+    if (!apiKey) {
+      const hasApiKey = await vscode.window.showQuickPick(
+        [
+          { label: "I have an API key", value: "has_key" },
+          { label: "Sign up / Get API key", value: "signup" },
+          { label: "Cancel", value: "cancel" },
+        ],
+        {
+          placeHolder: "Do you have a PromptGuard API key?",
+          ignoreFocusOut: true,
+        },
+      );
+
+      if (!hasApiKey || hasApiKey.value === "cancel") {
+        return;
+      }
+
+      if (hasApiKey.value === "signup") {
+        const openSignup = await vscode.window.showInformationMessage(
+          "Open PromptGuard signup page?",
+          "Open Browser",
+          "Cancel",
+        );
+
+        if (openSignup === "Open Browser") {
+          void vscode.env.openExternal(vscode.Uri.parse("https://app.promptguard.co/signup"));
+        }
+
+        const continueAfterSignup = await vscode.window.showQuickPick(
+          [
+            { label: "I have my API key now", value: "continue" },
+            { label: "Cancel", value: "cancel" },
+          ],
+          {
+            placeHolder: "Have you signed up and got your API key?",
+            ignoreFocusOut: true,
+          },
+        );
+
+        if (!continueAfterSignup || continueAfterSignup.value === "cancel") {
+          return;
+        }
+      }
+
+      apiKey = await secrets.promptAndStoreApiKey();
+      if (!apiKey) {
+        void vscode.window.showWarningMessage("Initialization cancelled: API key required");
         return;
       }
     }
 
-    // Prompt for API key
-    const apiKey = await vscode.window.showInputBox({
-      prompt: "Enter your PromptGuard API key",
-      placeHolder: "pg_sk_...",
-      ignoreFocusOut: true,
-      password: true,
-    });
-
-    if (!apiKey) {
-      vscode.window.showWarningMessage("Initialization cancelled: API key required");
-      return;
-    }
-
-    // Optional: Select providers
     const providerOptions = [
       { label: "All providers", value: "all" },
       { label: "OpenAI", value: "openai" },
@@ -90,25 +109,21 @@ export async function initCommand(
         ? selectedProviders.map((p) => p.value)
         : undefined;
 
-    outputChannel.appendLine("Running: promptguard init...");
+    output.appendLine("Running: promptguard init...");
 
     await cli.init({
       apiKey,
       provider: providers,
-      auto: true, // Auto-confirm to avoid blocking
+      auto: true,
     });
 
-    outputChannel.appendLine("✓ PromptGuard initialized successfully");
-    vscode.window.showInformationMessage("PromptGuard initialized successfully");
-
-    // Refresh status
-    const statusBar = getStatusBar();
-    if (statusBar) {
-      await statusBar.updateStatus();
-    }
+    output.appendLine("✓ PromptGuard initialized successfully");
+    void vscode.window.showInformationMessage("PromptGuard initialized successfully");
+    void vscode.commands.executeCommand("promptguard.refreshUI");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outputChannel.appendLine(`✗ Error: ${message}`);
-    void vscode.window.showErrorMessage(`PromptGuard initialization failed: ${message}`);
+    output.appendLine(`✗ Error: ${errorMessage(error)}`);
+    void vscode.window.showErrorMessage(
+      `PromptGuard initialization failed: ${errorMessage(error)}`,
+    );
   }
 }

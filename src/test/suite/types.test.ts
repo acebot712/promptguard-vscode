@@ -4,7 +4,7 @@ import {
   ScanResult,
   ProviderResult,
   SdkInstance,
-  SecurityScanResult,
+  ThreatDetectionResult,
   RedactResult,
   RedactedEntity,
 } from "../../types";
@@ -69,8 +69,8 @@ suite("Types Test Suite", () => {
   // SECURITY SCAN RESULT TESTS
   // ==========================================================================
 
-  test("SecurityScanResult should have decision and confidence", () => {
-    const result: SecurityScanResult = {
+  test("ThreatDetectionResult should have decision and confidence", () => {
+    const result: ThreatDetectionResult = {
       decision: "block",
       confidence: 0.95,
       threat_type: "prompt_injection",
@@ -82,8 +82,8 @@ suite("Types Test Suite", () => {
     assert.strictEqual(result.threat_type, "prompt_injection");
   });
 
-  test("SecurityScanResult allow decision", () => {
-    const result: SecurityScanResult = {
+  test("ThreatDetectionResult allow decision", () => {
+    const result: ThreatDetectionResult = {
       decision: "allow",
       confidence: 0.98,
     };

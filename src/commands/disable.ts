@@ -1,13 +1,10 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { getStatusBar } from "../extension";
+import { errorMessage } from "../utils";
 
-export async function disableCommand(
-  cli: CliWrapper,
-  outputChannel: vscode.OutputChannel,
-): Promise<void> {
-  outputChannel.appendLine("PromptGuard: Disable");
-  outputChannel.show(true);
+export async function disableCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
+  output.appendLine("PromptGuard: Disable");
+  output.show(true);
 
   try {
     const confirm = await vscode.window.showWarningMessage(
@@ -18,24 +15,18 @@ export async function disableCommand(
     );
 
     if (confirm !== "Yes") {
-      outputChannel.appendLine("Cancelled by user");
+      output.appendLine("Cancelled by user");
       return;
     }
 
-    outputChannel.appendLine("Running: promptguard disable...");
+    output.appendLine("Running: promptguard disable...");
     await cli.disable();
 
-    outputChannel.appendLine("✓ PromptGuard disabled");
-    vscode.window.showInformationMessage("PromptGuard disabled");
-
-    // Refresh status
-    const statusBar = getStatusBar();
-    if (statusBar) {
-      await statusBar.updateStatus();
-    }
+    output.appendLine("✓ PromptGuard disabled");
+    void vscode.window.showInformationMessage("PromptGuard disabled");
+    void vscode.commands.executeCommand("promptguard.refreshUI");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outputChannel.appendLine(`✗ Error: ${message}`);
-    void vscode.window.showErrorMessage(`PromptGuard disable failed: ${message}`);
+    output.appendLine(`✗ Error: ${errorMessage(error)}`);
+    void vscode.window.showErrorMessage(`PromptGuard disable failed: ${errorMessage(error)}`);
   }
 }

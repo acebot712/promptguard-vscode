@@ -1,13 +1,10 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { getStatusBar } from "../extension";
+import { errorMessage } from "../utils";
 
-export async function applyCommand(
-  cli: CliWrapper,
-  outputChannel: vscode.OutputChannel,
-): Promise<void> {
-  outputChannel.appendLine("PromptGuard: Apply Transformations");
-  outputChannel.show(true);
+export async function applyCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
+  output.appendLine("PromptGuard: Apply Transformations");
+  output.show(true);
 
   try {
     const confirm = await vscode.window.showWarningMessage(
@@ -18,24 +15,18 @@ export async function applyCommand(
     );
 
     if (confirm !== "Yes") {
-      outputChannel.appendLine("Cancelled by user");
+      output.appendLine("Cancelled by user");
       return;
     }
 
-    outputChannel.appendLine("Running: promptguard apply...");
-    await cli.apply(true); // Auto-confirm
+    output.appendLine("Running: promptguard apply...");
+    await cli.apply(true);
 
-    outputChannel.appendLine("✓ Transformations applied successfully");
-    vscode.window.showInformationMessage("PromptGuard transformations applied successfully");
-
-    // Refresh status
-    const statusBar = getStatusBar();
-    if (statusBar) {
-      await statusBar.updateStatus();
-    }
+    output.appendLine("✓ Transformations applied successfully");
+    void vscode.window.showInformationMessage("PromptGuard transformations applied successfully");
+    void vscode.commands.executeCommand("promptguard.refreshUI");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    outputChannel.appendLine(`✗ Error: ${message}`);
-    void vscode.window.showErrorMessage(`PromptGuard apply failed: ${message}`);
+    output.appendLine(`✗ Error: ${errorMessage(error)}`);
+    void vscode.window.showErrorMessage(`PromptGuard apply failed: ${errorMessage(error)}`);
   }
 }

@@ -5,19 +5,18 @@ import * as os from "os";
 import {
   ScanResult,
   StatusResult,
-  SecurityScanResult,
+  ThreatDetectionResult,
   RedactResult,
   CliExecutionError,
 } from "./types";
+import { errorMessage } from "./utils";
 
-/** Timeout for CLI commands in milliseconds (30 seconds) */
 const CLI_TIMEOUT_MS = 30000;
 
 export class CliWrapper {
   private cliPath: string | null = null;
 
   async findCliBinary(): Promise<string | null> {
-    // Check configuration first
     const config = vscode.workspace.getConfiguration("promptguard");
     const configuredPath = config.get<string>("cliPath");
     if (configuredPath && configuredPath.trim() !== "") {
@@ -26,10 +25,9 @@ export class CliWrapper {
       }
     }
 
-    // Check PATH using 'which' (Unix) or 'where' (Windows)
     try {
       const whichCmd = process.platform === "win32" ? "where" : "which";
-      const foundPath = await this.execSimple(whichCmd, ["promptguard"]);
+      const foundPath = await this.execRaw(whichCmd, ["promptguard"]);
       if (foundPath && (await this.isValidBinary(foundPath))) {
         return foundPath;
       }
@@ -37,14 +35,12 @@ export class CliWrapper {
       // Not in PATH
     }
 
-    // Check common install locations
     const commonPaths = [
       "/usr/local/bin/promptguard",
       path.join(os.homedir(), ".cargo", "bin", "promptguard"),
       path.join(os.homedir(), ".local", "bin", "promptguard"),
     ];
 
-    // Add Windows paths if on Windows
     if (process.platform === "win32") {
       commonPaths.push(
         path.join(
@@ -65,7 +61,7 @@ export class CliWrapper {
     return null;
   }
 
-  private async execSimple(cmd: string, args: string[]): Promise<string> {
+  private async execRaw(cmd: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       child_process.execFile(cmd, args, { timeout: CLI_TIMEOUT_MS }, (error, stdout) => {
         if (error) {
@@ -79,7 +75,7 @@ export class CliWrapper {
 
   private async isValidBinary(binPath: string): Promise<boolean> {
     try {
-      const stdout = await this.execSimple(binPath, ["--version"]);
+      const stdout = await this.execRaw(binPath, ["--version"]);
       return stdout.length > 0;
     } catch {
       return false;
@@ -91,8 +87,8 @@ export class CliWrapper {
       return this.cliPath;
     }
 
-    const path = await this.findCliBinary();
-    if (!path) {
+    const foundPath = await this.findCliBinary();
+    if (!foundPath) {
       throw new Error(
         "PromptGuard CLI not found. Please install it first:\n" +
           "  curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh\n\n" +
@@ -100,17 +96,15 @@ export class CliWrapper {
       );
     }
 
-    this.cliPath = path;
-    return path;
+    this.cliPath = foundPath;
+    return foundPath;
   }
 
-  async executeCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  private async executeCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
     const cliPath = await this.getCliPath();
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
     return new Promise((resolve, reject) => {
-      // Use execFile instead of exec to prevent command injection
-      // execFile passes arguments as an array, not through shell interpolation
       child_process.execFile(
         cliPath,
         args,
@@ -133,24 +127,16 @@ export class CliWrapper {
     });
   }
 
-  async scan(provider?: string): Promise<ScanResult> {
-    const args = ["scan", "--json"];
-    if (provider) {
-      args.push("--provider", provider);
-    }
-
+  private async executeJson<T>(args: string[]): Promise<T> {
     const { stdout, stderr } = await this.executeCommand(args);
-
     if (stderr && !stdout) {
       throw new CliExecutionError(stderr, undefined, stderr, stdout);
     }
-
     try {
-      return JSON.parse(stdout) as ScanResult;
-    } catch (parseError) {
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      return JSON.parse(stdout) as T;
+    } catch (e) {
       throw new CliExecutionError(
-        `Failed to parse scan output: ${errorMessage}`,
+        `Failed to parse output: ${errorMessage(e)}`,
         undefined,
         stderr,
         stdout,
@@ -158,24 +144,12 @@ export class CliWrapper {
     }
   }
 
+  async scan(): Promise<ScanResult> {
+    return this.executeJson<ScanResult>(["scan", "--json"]);
+  }
+
   async status(): Promise<StatusResult> {
-    const { stdout, stderr } = await this.executeCommand(["status", "--json"]);
-
-    if (stderr && !stdout) {
-      throw new CliExecutionError(stderr, undefined, stderr, stdout);
-    }
-
-    try {
-      return JSON.parse(stdout) as StatusResult;
-    } catch (parseError) {
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(
-        `Failed to parse status output: ${errorMessage}`,
-        undefined,
-        stderr,
-        stdout,
-      );
-    }
+    return this.executeJson<StatusResult>(["status", "--json"]);
   }
 
   async init(options: {
@@ -207,7 +181,7 @@ export class CliWrapper {
     await this.executeCommand(args);
   }
 
-  async apply(autoConfirm: boolean = false): Promise<void> {
+  async apply(autoConfirm = false): Promise<void> {
     const args = ["apply"];
     if (autoConfirm) {
       args.push("--yes");
@@ -219,64 +193,16 @@ export class CliWrapper {
     await this.executeCommand(["disable"]);
   }
 
-  async enable(runtime: boolean = false): Promise<void> {
-    const args = ["enable"];
-    if (runtime) {
-      args.push("--runtime");
-    }
-    await this.executeCommand(args);
+  async enable(): Promise<void> {
+    await this.executeCommand(["enable"]);
   }
 
-  /**
-   * Scan text for security threats via the backend API.
-   * Requires the project to be initialized with an API key.
-   */
-  async scanText(text: string): Promise<SecurityScanResult> {
-    // Use --text flag with the new CLI scan command
-    const args = ["scan", "--json", "--text", text];
-    const { stdout, stderr } = await this.executeCommand(args);
-
-    if (stderr && !stdout) {
-      throw new CliExecutionError(stderr, undefined, stderr, stdout);
-    }
-
-    try {
-      return JSON.parse(stdout) as SecurityScanResult;
-    } catch (parseError) {
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(
-        `Failed to parse scan output: ${errorMessage}`,
-        undefined,
-        stderr,
-        stdout,
-      );
-    }
+  async detectThreats(text: string): Promise<ThreatDetectionResult> {
+    return this.executeJson<ThreatDetectionResult>(["scan", "--json", "--text", text]);
   }
 
-  /**
-   * Redact PII from text via the backend API.
-   * Requires the project to be initialized with an API key.
-   */
   async redactText(text: string): Promise<RedactResult> {
-    // Use --text flag with the new CLI redact command
-    const args = ["redact", "--json", "--text", text];
-    const { stdout, stderr } = await this.executeCommand(args);
-
-    if (stderr && !stdout) {
-      throw new CliExecutionError(stderr, undefined, stderr, stdout);
-    }
-
-    try {
-      return JSON.parse(stdout) as RedactResult;
-    } catch (parseError) {
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      throw new CliExecutionError(
-        `Failed to parse redact output: ${errorMessage}`,
-        undefined,
-        stderr,
-        stdout,
-      );
-    }
+    return this.executeJson<RedactResult>(["redact", "--json", "--text", text]);
   }
 
   resetCache(): void {
