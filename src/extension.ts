@@ -16,6 +16,7 @@ import { scanSelectionCommand } from "./commands/scanSelection";
 import { redactSelectionCommand } from "./commands/redactSelection";
 import { scanFileCommand } from "./commands/scanFile";
 import { setApiKeyCommand } from "./commands/setApiKey";
+import { selectProjectCommand } from "./commands/selectProject";
 import { installCliCommand } from "./commands/installCli";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -65,6 +66,9 @@ export function activate(context: vscode.ExtensionContext): void {
       scanFileCommand(cli, outputChannel, uri),
     ),
     vscode.commands.registerCommand("promptguard.setApiKey", () => setApiKeyCommand(secrets)),
+    vscode.commands.registerCommand("promptguard.selectProject", () =>
+      selectProjectCommand(cli, outputChannel),
+    ),
     vscode.commands.registerCommand("promptguard.installCli", () =>
       installCliCommand(context, cli, outputChannel),
     ),

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { errorMessage } from "../utils";
+import { errorMessage, handleQuotaError } from "../utils";
 
 export async function scanSelectionCommand(
   cli: CliWrapper,
@@ -54,7 +54,9 @@ export async function scanSelectionCommand(
         }
       } catch (error) {
         output.appendLine(`Error: ${errorMessage(error)}`);
-        void vscode.window.showErrorMessage(`Scan failed: ${errorMessage(error)}`);
+        if (!(await handleQuotaError(error))) {
+          void vscode.window.showErrorMessage(`Scan failed: ${errorMessage(error)}`);
+        }
       }
     },
   );

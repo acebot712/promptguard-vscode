@@ -63,6 +63,17 @@ export interface RedactedEntity {
   end?: number;
 }
 
+export interface ProjectListResult {
+  projects: ProjectInfo[];
+  active_project?: string;
+}
+
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export class CliExecutionError extends Error {
   constructor(
     message: string,

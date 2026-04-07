@@ -7,6 +7,7 @@ import {
   StatusResult,
   ThreatDetectionResult,
   RedactResult,
+  ProjectListResult,
   CliExecutionError,
 } from "./types";
 import { errorMessage } from "./utils";
@@ -203,6 +204,14 @@ export class CliWrapper {
 
   async redactText(text: string): Promise<RedactResult> {
     return this.executeJson<RedactResult>(["redact", "--json", "--text", text]);
+  }
+
+  async listProjects(): Promise<ProjectListResult> {
+    return this.executeJson<ProjectListResult>(["projects", "list", "--json"]);
+  }
+
+  async selectProject(projectId: string): Promise<void> {
+    await this.executeCommand(["projects", "select", projectId]);
   }
 
   resetCache(): void {

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "../cli";
-import { errorMessage } from "../utils";
+import { errorMessage, handleQuotaError } from "../utils";
 
 export async function scanFileCommand(
   cli: CliWrapper,
@@ -40,7 +40,9 @@ export async function scanFileCommand(
         }
       } catch (error) {
         output.appendLine(`Error: ${errorMessage(error)}`);
-        void vscode.window.showErrorMessage(`File scan failed: ${errorMessage(error)}`);
+        if (!(await handleQuotaError(error))) {
+          void vscode.window.showErrorMessage(`File scan failed: ${errorMessage(error)}`);
+        }
       }
     },
   );

@@ -2,7 +2,7 @@
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
   "description": "Plug-and-play LLM security for your AI applications",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {
@@ -105,6 +105,11 @@
       {
         "command": "promptguard.setApiKey",
         "title": "PromptGuard: Set API Key",
+        "category": "PromptGuard"
+      },
+      {
+        "command": "promptguard.selectProject",
+        "title": "PromptGuard: Select Project",
         "category": "PromptGuard"
       },
       {
