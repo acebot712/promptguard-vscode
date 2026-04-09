@@ -1,3 +1,6 @@
+[![CI](https://github.com/acebot712/promptguard-vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/acebot712/promptguard-vscode/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/acebot712/promptguard-vscode)](https://github.com/acebot712/promptguard-vscode/blob/main/LICENSE)
+
 # PromptGuard VS Code Extension
 
 Scan, detect, and secure LLM SDK usage in your codebase - directly in VS Code.
