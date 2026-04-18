@@ -2,6 +2,16 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [0.5.2] - 2026-04-18
+
+### Fixed
+
+- Packaged `.vsix` no longer includes the test suite, internal CI configs (`.github/`), AGENTS.md, `.pre-commit-config.yaml`, or ESLint/Prettier configs. Install size shrinks from ~74 KB / 46 files to ~53 KB / 29 files.
+
+### Changed
+
+- Bumped 7 dev-dependencies to current minor versions (`@eslint/js`, `@types/node`, `@typescript-eslint/*`, `eslint`, `glob`, `typescript-eslint`). `@types/vscode` deliberately held at `^1.80.0` to match `engines.vscode`.
+
 ## [0.2.1] - 2026-02-24
 
 ### Added
