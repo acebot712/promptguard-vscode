@@ -1,10 +1,40 @@
+# --- Dev tooling -------------------------------------------------------------
 .vscode/**
 .vscode-test/**
-src/**
-.gitignore
 .yarnrc
 vsc-extension-quickstart.md
-**/tsconfig.json
-**/*.map
-**/*.ts
+.gitignore
+.gitattributes
+.editorconfig
+.pre-commit-config.yaml
+.npmrc
+.nvmrc
 
+# Repo metadata
+AGENTS.md
+CONTRIBUTING.md
+.github/**
+
+# --- TypeScript sources ------------------------------------------------------
+src/**
+**/tsconfig.json
+**/*.ts
+**/*.map
+eslint.config.mjs
+eslint.config.js
+.eslintrc*
+prettier.config.*
+.prettierrc*
+
+# --- Test artefacts (compiled tests live in out/test/) ----------------------
+out/test/**
+**/*.test.js
+**/*.test.js.map
+**/*.spec.js
+**/*.spec.js.map
+
+# --- Build & local artefacts ------------------------------------------------
+**/*.tsbuildinfo
+*.vsix
+coverage/**
+node_modules/.cache/**
