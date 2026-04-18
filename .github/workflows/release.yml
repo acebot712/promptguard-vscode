@@ -5,13 +5,26 @@ on:
     tags:
       - 'v*'  # Trigger on tags like v0.1.0, v1.0.0
 
+# Default to read-only. Build and package don't need write -- only the
+# final ``Create Release`` step in the build job and the marketplace
+# publish job need their respective scoped writes.
 permissions:
-  contents: write
+  contents: read
+
+# Only one release at a time per tag. Don't cancel in progress -- a
+# half-complete marketplace publish leaves users in a bad state.
+concurrency:
+  group: release-vscode-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Build and Package Extension
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Needs write to push the GitHub Release at the end.
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -99,7 +112,11 @@ jobs:
     name: Publish to VS Code Marketplace
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
+    # Marketplace auth is via VSCE_PAT, no GITHUB_TOKEN write needed.
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
