@@ -63,7 +63,7 @@ jobs:
           retention-days: 30
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: PromptGuard VS Code Extension v${{ steps.get_version.outputs.VERSION }}
           body: |
