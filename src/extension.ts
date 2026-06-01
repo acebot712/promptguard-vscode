@@ -91,6 +91,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
   void statusBar.updateStatus();
   outputChannel.appendLine("PromptGuard extension activated");
+
+  void showFirstRunNotice(context);
+}
+
+const FIRST_RUN_NOTICE_KEY = "promptguard.firstRunNoticeShown";
+
+async function showFirstRunNotice(context: vscode.ExtensionContext): Promise<void> {
+  if (context.globalState.get<boolean>(FIRST_RUN_NOTICE_KEY)) {
+    return;
+  }
+  await context.globalState.update(FIRST_RUN_NOTICE_KEY, true);
+  void vscode.window.showInformationMessage(
+    "PromptGuard is active — open the shield icon in the Activity Bar to scan your project.",
+  );
 }
 
 async function checkCliInstallation(
@@ -108,6 +122,29 @@ async function checkCliInstallation(
       await config.update("cliPath", installedPath, vscode.ConfigurationTarget.Global);
       output.appendLine(`Using installed CLI at: ${installedPath}`);
       cli.resetCache();
+      return;
+    }
+
+    const autoInstall = vscode.workspace
+      .getConfiguration("promptguard")
+      .get<string>("autoInstallCli", "prompt");
+
+    if (autoInstall === "never") {
+      output.appendLine(
+        "PromptGuard CLI not found. Auto-install is disabled (promptguard.autoInstallCli=never). " +
+          "Set 'promptguard.cliPath' to the binary location.",
+      );
+      return;
+    }
+
+    if (autoInstall === "auto") {
+      output.appendLine(
+        "PromptGuard CLI not found. Installing silently (promptguard.autoInstallCli=auto)...",
+      );
+      const installedPath = await installCli(context, output);
+      if (installedPath) {
+        cli.resetCache();
+      }
       return;
     }
 

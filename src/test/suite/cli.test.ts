@@ -88,16 +88,14 @@ suite("CLI Wrapper Test Suite", () => {
   // ==========================================================================
 
   test("API key format validation", () => {
-    const validTestKey = "pg_sk_test_demo123456789012345678901234";
-    const validProdKey = "pg_sk_prod_live123456789012345678901234";
+    // Permissive: any key starting with "pg_" is valid; only clearly-wrong input is rejected.
+    const validLiveKey = "pg_live_demo123456789012345678901234";
+    const validFutureKey = "pg_future_scheme123456789012345678";
     const invalidKey = "sk_live_abc123";
 
-    assert.ok(validTestKey.startsWith("pg_sk_test_"), "Should accept test key format");
-    assert.ok(validProdKey.startsWith("pg_sk_prod_"), "Should accept prod key format");
-    assert.ok(
-      !invalidKey.startsWith("pg_sk_test_") && !invalidKey.startsWith("pg_sk_prod_"),
-      "Should reject non-PromptGuard key formats",
-    );
+    assert.ok(validLiveKey.startsWith("pg_"), "Should accept live key format");
+    assert.ok(validFutureKey.startsWith("pg_"), "Should accept future pg_ key formats");
+    assert.ok(!invalidKey.startsWith("pg_"), "Should reject non-PromptGuard key formats");
   });
 
   test("Proxy URL validation", () => {

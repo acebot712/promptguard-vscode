@@ -2,7 +2,7 @@
   "name": "promptguard-vscode",
   "displayName": "PromptGuard",
   "description": "Plug-and-play LLM security for your AI applications",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "publisher": "promptguard",
   "icon": "icon.png",
   "engines": {
@@ -113,7 +113,7 @@
         "category": "PromptGuard"
       },
       {
-        "command": "promptguard.refreshTree",
+        "command": "promptguard.refreshUI",
         "title": "PromptGuard: Refresh",
         "category": "PromptGuard",
         "icon": "$(refresh)"
@@ -125,6 +125,13 @@
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "promptguard.refreshUI",
+          "when": "view == promptguard.managedFiles",
+          "group": "navigation"
+        }
+      ],
       "editor/context": [
         {
           "command": "promptguard.scanSelection",
@@ -152,6 +159,26 @@
           "type": "string",
           "default": "",
           "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH."
+        },
+        "promptguard.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-scan the workspace for LLM SDK usage when a supported file is saved. Disable if scanning is slow on large workspaces."
+        },
+        "promptguard.autoInstallCli": {
+          "type": "string",
+          "enum": [
+            "prompt",
+            "never",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Ask before installing the CLI when it is not found (default).",
+            "Never offer to install the CLI; configure the path manually.",
+            "Install the CLI silently when it is not found."
+          ],
+          "default": "prompt",
+          "description": "Behavior when the PromptGuard CLI is not found on first run: prompt (ask), never (do nothing), or auto (install silently)."
         }
       }
     },
