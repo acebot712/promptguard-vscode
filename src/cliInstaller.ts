@@ -55,6 +55,28 @@ function httpsGetFollowRedirects(
 ): Promise<http.IncomingMessage> {
   return new Promise((resolve, reject) => {
     const makeRequest = (requestUrl: string) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(requestUrl);
+      } catch {
+        reject(new Error(`Invalid download URL: ${requestUrl}`));
+        return;
+      }
+      const host = parsed.hostname;
+      const trusted =
+        parsed.protocol === "https:" &&
+        (host === "github.com" ||
+          host === "api.github.com" ||
+          host.endsWith(".github.com") ||
+          host.endsWith(".githubusercontent.com"));
+      if (!trusted) {
+        reject(
+          new Error(
+            `Refusing to download PromptGuard CLI from untrusted host: ${host}`,
+          ),
+        );
+        return;
+      }
       https
         .get(
           requestUrl,

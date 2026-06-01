@@ -15,7 +15,18 @@ Scan, detect, and secure LLM SDK usage in your codebase - directly in VS Code.
 - **PII Redaction**: Redact sensitive data from selected text
 - **CLI Integration**: Seamlessly wraps the PromptGuard CLI
 
-> **Tip:** For new projects, the [PromptGuard SDK](https://docs.promptguard.co/sdks/python) with auto-instrumentation (`promptguard.init()`) is the recommended integration - one line of code secures all LLM calls. The CLI and this extension are best for scanning existing codebases and applying proxy-mode transforms.
+> **Tip:** For new projects, the [PromptGuard SDK](https://docs.promptguard.co/sdks/python) with auto-instrumentation (`promptguard.init()`) is the recommended integration - one line of code secures all LLM calls. The CLI and this extension are best for scanning existing codebases and applying proxy-mode transforms. (Python: install `promptguard-sdk`, import as `promptguard`.)
+
+## Screenshots
+
+![Inline diagnostics and quick-fix](images/diagnostics.png)
+_Inline diagnostic squiggle on an unprotected LLM SDK call, with the PromptGuard quick-fix._
+
+![Status bar states](images/status-bar.png)
+_Status bar indicator showing Active / Disabled / Not initialized states._
+
+![Sidebar tree](images/sidebar.png)
+_PromptGuard Activity Bar view: status, managed files, and quick actions._
 
 ## Requirements
 
@@ -82,6 +93,14 @@ If the CLI is not in your PATH, you can set a custom path:
 
 Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptguard.exe`
 
+### Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `promptguard.cliPath` | `""` | Path to the CLI binary. Leave empty to auto-detect from PATH. |
+| `promptguard.scanOnSave` | `true` | Re-scan the workspace for LLM SDK usage when a supported file is saved. Disable if scanning is slow on large workspaces. |
+| `promptguard.autoInstallCli` | `"prompt"` | Behavior when the CLI is not found: `prompt` (ask), `never` (do nothing), or `auto` (install silently). |
+
 ## Commands
 
 - `PromptGuard: Initialize` - Set up PromptGuard in your project
@@ -90,6 +109,14 @@ Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptgua
 - `PromptGuard: Apply Transformations` - Apply PromptGuard transformations
 - `PromptGuard: Disable` - Temporarily disable PromptGuard
 - `PromptGuard: Enable` - Re-enable PromptGuard
+- `PromptGuard: Set API Key` - Store your PromptGuard API key securely
+- `PromptGuard: Select Project` - Switch the active PromptGuard project
+- `PromptGuard: Scan Selection for Threats` - Scan the selected text for prompt injection and PII
+- `PromptGuard: Redact PII from Selection` - Redact sensitive data from the selected text
+- `PromptGuard: Scan File for Threats` - Scan an entire file for security threats
+- `PromptGuard: Install/Update CLI` - Install or update the PromptGuard CLI
+
+Right-click in the editor to Scan/Redact a selection; right-click a file in the Explorer to scan it.
 
 ## Status Bar
 
@@ -99,6 +126,10 @@ The status bar shows:
 - **Not initialized** - PromptGuard hasn't been set up yet
 
 Click the status bar to view detailed status.
+
+## Sidebar
+
+Open the shield icon in the Activity Bar for the PromptGuard view. It shows current status, managed files, and an **Actions** group with quick buttons to Initialize / Scan / Enable / Disable, plus **Set API Key** and **Select Project** so you can configure a key or switch projects without opening the Command Palette. Use the refresh icon in the view title bar to update both the tree and the status bar.
 
 ## Supported Languages
 

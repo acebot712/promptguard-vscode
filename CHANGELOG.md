@@ -2,6 +2,21 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [0.6.0] - 2026-06-01
+
+### Added
+
+- Marketplace screenshots (inline diagnostics + quick-fix, status-bar states, sidebar view).
+- `promptguard.autoInstallCli` now supports `auto` — silently install the CLI when it's not found — matching the documented behavior.
+- `promptguard.scanOnSave` setting to re-scan the workspace when a supported file is saved (debounced).
+- Sidebar quick actions for **Set API Key** and **Select Project**, plus a one-time first-run notice.
+
+### Changed
+
+- Unified refresh: a single `promptguard.refreshUI` command refreshes both the status bar and the tree, with a refresh button in the view title.
+- API-key validation relaxed to accept any `pg_`-prefixed key (≥12 chars) so a backend key-format change can't break the client.
+- CLI auto-install downloads are restricted to GitHub over HTTPS.
+
 ## [0.5.2] - 2026-04-18
 
 ### Fixed

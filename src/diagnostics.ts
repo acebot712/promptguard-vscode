@@ -3,22 +3,45 @@ import { CliWrapper } from "./cli";
 import { ScanResult } from "./types";
 import { SUPPORTED_LANGUAGES } from "./utils";
 
+const SCAN_DEBOUNCE_MS = 500;
+
 export class PromptGuardDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
   private cli: CliWrapper;
   private disposables: vscode.Disposable[] = [];
+  private debounceTimer: NodeJS.Timeout | undefined;
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
     this.diagnosticCollection = vscode.languages.createDiagnosticCollection("promptguard");
   }
 
+  private isScanOnSaveEnabled(): boolean {
+    return vscode.workspace.getConfiguration("promptguard").get<boolean>("scanOnSave", true);
+  }
+
+  /** Debounced workspace scan to avoid re-running a full scan on every keystroke-triggered save. */
+  private scheduleScan(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = undefined;
+      void this.scanWorkspace();
+    }, SCAN_DEBOUNCE_MS);
+  }
+
   activate(context: vscode.ExtensionContext): void {
     void this.scanWorkspace();
 
     const fileWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
+      if (!this.isScanOnSaveEnabled()) {
+        return;
+      }
+      // The CLI's SDK detection scans the whole workspace (no single-file mode),
+      // so we debounce to coalesce rapid saves into one scan.
       if (SUPPORTED_LANGUAGES.includes(document.languageId)) {
-        void this.scanWorkspace();
+        this.scheduleScan();
       }
     });
 
@@ -115,6 +138,10 @@ export class PromptGuardDiagnostics {
   }
 
   dispose(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
     this.diagnosticCollection.dispose();
     for (const d of this.disposables) {
       d.dispose();

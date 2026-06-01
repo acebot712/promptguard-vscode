@@ -148,6 +148,17 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
         }
       }
 
+      // Always offer key/project management so users don't have to hunt the palette.
+      const setApiKeyItem = new vscode.TreeItem("Set API Key");
+      setApiKeyItem.command = { command: "promptguard.setApiKey", title: "Set API Key" };
+      setApiKeyItem.iconPath = new vscode.ThemeIcon("key");
+      actionItems.push(setApiKeyItem);
+
+      const selectProjectItem = new vscode.TreeItem("Select Project");
+      selectProjectItem.command = { command: "promptguard.selectProject", title: "Select Project" };
+      selectProjectItem.iconPath = new vscode.ThemeIcon("project");
+      actionItems.push(selectProjectItem);
+
       if (actionItems.length > 0) {
         items.push(new CategoryTreeItem("Actions", actionItems, "zap"));
       }
@@ -179,11 +190,9 @@ export function registerTreeView(
 
   context.subscriptions.push(treeView);
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("promptguard.refreshTree", () => {
-      treeDataProvider.refresh();
-    }),
-  );
+  // Note: the single refresh command "promptguard.refreshUI" is registered in
+  // extension.ts and refreshes BOTH the status bar and this tree. We intentionally
+  // do not register a tree-only refresh command here to avoid duplication.
 
   return treeDataProvider;
 }

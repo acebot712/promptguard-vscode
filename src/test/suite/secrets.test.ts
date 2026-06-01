@@ -16,23 +16,27 @@ suite("Secrets Test Suite", () => {
   // API KEY FORMAT VALIDATION TESTS
   // ==========================================================================
 
-  test("Valid test API key format", () => {
-    const validTestKey = "pg_sk_test_abcdef1234567890abcdef1234567890";
-    assert.ok(validTestKey.startsWith("pg_sk_test_"));
-    assert.ok(validTestKey.length > 20);
+  test("Valid live API key format", () => {
+    const validLiveKey = "pg_live_abcdef1234567890abcdef1234567890";
+    assert.ok(validLiveKey.startsWith("pg_"));
+    assert.ok(validLiveKey.length > 20);
   });
 
-  test("Valid production API key format", () => {
-    const validProdKey = "pg_sk_prod_abcdef1234567890abcdef1234567890";
-    assert.ok(validProdKey.startsWith("pg_sk_prod_"));
-    assert.ok(validProdKey.length > 20);
+  test("Permissive validator accepts any pg_ key", () => {
+    // The validator must be permissive: any key starting with "pg_" is accepted
+    // so a backend key-format change never breaks the client.
+    const acceptedKeys = ["pg_live_abc123", "pg_anything_future_scheme", "pg_123456789"];
+
+    for (const key of acceptedKeys) {
+      assert.ok(key.trim().startsWith("pg_"), `Key should be accepted: ${key}`);
+    }
   });
 
   test("Invalid API key format detection", () => {
-    const invalidKeys = ["other_key_123456789012345678901234", "pg_123456789", "randomstring", ""];
+    const invalidKeys = ["other_key_123456789012345678901234", "randomstring", ""];
 
     for (const key of invalidKeys) {
-      const isValid = key.startsWith("pg_sk_test_") || key.startsWith("pg_sk_prod_");
+      const isValid = key.trim().startsWith("pg_");
       assert.ok(!isValid, `Key should be invalid: ${key}`);
     }
   });
@@ -44,7 +48,7 @@ suite("Secrets Test Suite", () => {
   test("Input box options structure", () => {
     const inputBoxOptions: vscode.InputBoxOptions = {
       prompt: "Enter your PromptGuard API key",
-      placeHolder: "pg_sk_test_... or pg_sk_prod_...",
+      placeHolder: "pg_live_xxx",
       password: true,
       ignoreFocusOut: true,
     };
@@ -55,17 +59,22 @@ suite("Secrets Test Suite", () => {
   });
 
   test("API key validation logic", () => {
-    // Test validation logic separately
+    // Permissive validation: accept any non-empty key starting with "pg_".
     const validateApiKey = (value: string): string | null => {
-      if (!value.startsWith("pg_sk_test_") && !value.startsWith("pg_sk_prod_")) {
+      const trimmed = value?.trim() ?? "";
+      if (!trimmed) {
+        return "API key is required";
+      }
+      if (!trimmed.startsWith("pg_")) {
         return "Invalid API key format";
       }
       return null;
     };
 
-    assert.strictEqual(validateApiKey("pg_sk_test_valid123"), null);
-    assert.strictEqual(validateApiKey("pg_sk_prod_valid456"), null);
+    assert.strictEqual(validateApiKey("pg_live_valid123"), null);
+    assert.strictEqual(validateApiKey("pg_future_scheme456"), null);
     assert.ok(validateApiKey("invalid_key") !== null);
+    assert.ok(validateApiKey("") !== null);
   });
 
   // ==========================================================================

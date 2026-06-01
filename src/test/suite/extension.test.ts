@@ -37,7 +37,9 @@ suite("Extension Test Suite", () => {
       "promptguard.redactSelection",
       "promptguard.scanFile",
       "promptguard.setApiKey",
-      "promptguard.refreshTree",
+      "promptguard.selectProject",
+      "promptguard.installCli",
+      "promptguard.refreshUI",
     ];
 
     for (const cmd of expectedCommands) {
