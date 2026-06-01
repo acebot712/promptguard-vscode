@@ -70,11 +70,7 @@ function httpsGetFollowRedirects(
           host.endsWith(".github.com") ||
           host.endsWith(".githubusercontent.com"));
       if (!trusted) {
-        reject(
-          new Error(
-            `Refusing to download PromptGuard CLI from untrusted host: ${host}`,
-          ),
-        );
+        reject(new Error(`Refusing to download PromptGuard CLI from untrusted host: ${host}`));
         return;
       }
       https
