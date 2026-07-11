@@ -19,6 +19,21 @@ const CLI_TIMEOUT_MS = 30000;
 const SENSITIVE_FLAGS = new Set(["--api-key"]);
 
 /**
+ * `execFile` caps captured stdout/stderr at 1 MiB by default and kills the
+ * child when exceeded. A workspace scan's JSON output (every instance of
+ * every provider) can easily exceed that, so raise the cap generously.
+ */
+const MAX_OUTPUT_BUFFER_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Exit code the CLI uses for "findings" (content blocked / SDK usage found).
+ * See promptguard-cli/src/commands/scan.rs (`EXIT_FINDINGS`) and main.rs:
+ * 0 = clean/allow, 2 = findings/block, 1 = error. Exit 2 still writes the
+ * full JSON result to stdout and must NOT be treated as a failure.
+ */
+export const CLI_EXIT_FINDINGS = 2;
+
+/**
  * Redact values of sensitive flags (e.g. `--api-key`) from an argv array so
  * they never leak into error messages, toasts, or the output channel.
  * Handles both `--api-key VALUE` and `--api-key=VALUE` forms.
@@ -56,9 +71,26 @@ export function firstLine(output: string): string {
   return output.split(/\r?\n/)[0].trim();
 }
 
+/**
+ * Produce a single, safe-to-display line from CLI stderr for user-facing
+ * error messages. Takes the first line only and redacts anything that looks
+ * like an API key or an `--api-key` value (same spirit as redactCliArgs) so
+ * a secret echoed by the CLI can never reach a toast or log.
+ */
+export function sanitizeCliOutputLine(output: string): string {
+  return firstLine(output)
+    .replace(/--api-key(=|\s+)\S+/g, "--api-key$1***REDACTED***")
+    .replace(/\bpg_[A-Za-z0-9_]{8,}\b/g, "***REDACTED***");
+}
+
 interface ExecOptions {
   cwd?: string;
   env?: Record<string, string>;
+  /**
+   * Non-zero exit codes that still mean "command succeeded, parse stdout".
+   * Used for `scan`, where exit 2 = findings/block with full JSON on stdout.
+   */
+  successExitCodes?: readonly number[];
 }
 
 export class CliWrapper {
@@ -162,15 +194,27 @@ export class CliWrapper {
       child_process.execFile(
         cliPath,
         args,
-        { cwd, timeout: CLI_TIMEOUT_MS, env },
+        { cwd, timeout: CLI_TIMEOUT_MS, env, maxBuffer: MAX_OUTPUT_BUFFER_BYTES },
         (error, stdout, stderr) => {
           if (error) {
+            const exitCode = typeof error.code === "number" ? error.code : undefined;
+            // Differentiated exit codes: some commands use a non-zero exit to
+            // signal findings (scan: 2 = block/findings) while still writing
+            // the full JSON result to stdout. Treating those as failures would
+            // discard valid results exactly when there is something to report.
+            if (exitCode !== undefined && options?.successExitCodes?.includes(exitCode)) {
+              resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+              return;
+            }
             // Defense in depth: redact sensitive flag values from the argv we
             // embed in the error message (they should never be there anyway).
+            // Include a sanitized first line of stderr so the user-facing
+            // toast explains WHY the command failed, not just that it did.
+            const detail = stderr ? ` — ${sanitizeCliOutputLine(stderr)}` : "";
             reject(
               new CliExecutionError(
-                `Command failed: promptguard ${redactCliArgs(args).join(" ")}`,
-                typeof error.code === "number" ? error.code : undefined,
+                `Command failed: promptguard ${redactCliArgs(args).join(" ")}${detail}`,
+                exitCode,
                 stderr || error.message || "",
                 stdout || "",
               ),
@@ -206,19 +250,27 @@ export class CliWrapper {
    * visible to every process on the machine (`ps`) and breaks on inputs
    * larger than ARG_MAX.
    */
-  private async executeJsonWithContent<T>(baseArgs: string[], content: string): Promise<T> {
+  private async executeJsonWithContent<T>(
+    baseArgs: string[],
+    content: string,
+    options?: ExecOptions,
+  ): Promise<T> {
     const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "promptguard-"));
     const filePath = path.join(dir, "input.txt");
     try {
       await fs.promises.writeFile(filePath, content, { mode: 0o600 });
-      return await this.executeJson<T>([...baseArgs, "--file", filePath]);
+      return await this.executeJson<T>([...baseArgs, "--file", filePath], options);
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true });
     }
   }
 
   async scan(cwd?: string): Promise<ScanResult> {
-    return this.executeJson<ScanResult>(["scan", "--json"], { cwd });
+    // Exit 2 = SDK usage found; the JSON report is still on stdout.
+    return this.executeJson<ScanResult>(["scan", "--json"], {
+      cwd,
+      successExitCodes: [CLI_EXIT_FINDINGS],
+    });
   }
 
   async status(): Promise<StatusResult> {
@@ -275,7 +327,11 @@ export class CliWrapper {
   }
 
   async detectThreats(text: string): Promise<ThreatDetectionResult> {
-    return this.executeJsonWithContent<ThreatDetectionResult>(["scan", "--json"], text);
+    // Exit 2 = content blocked; the JSON verdict is still on stdout. Without
+    // this, "Scan failed" would appear exactly when a threat IS detected.
+    return this.executeJsonWithContent<ThreatDetectionResult>(["scan", "--json"], text, {
+      successExitCodes: [CLI_EXIT_FINDINGS],
+    });
   }
 
   async redactText(text: string): Promise<RedactResult> {

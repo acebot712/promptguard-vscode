@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { CliExecutionError } from "./types";
 
 export const SUPPORTED_LANGUAGES: string[] = [
   "typescript",
@@ -14,9 +15,20 @@ export function errorMessage(error: unknown): string {
 
 const BILLING_URL = "https://app.promptguard.co/billing";
 
+/**
+ * Whether an error indicates the PromptGuard plan quota was exceeded. The
+ * CLI reports API errors on stderr (`Error: ... quota exceeded ...`), which
+ * CliExecutionError captures separately from its message — so both must be
+ * inspected. Exported so tests exercise the real predicate.
+ */
+export function isQuotaError(error: unknown): boolean {
+  const stderr = error instanceof CliExecutionError ? (error.stderr ?? "") : "";
+  const haystack = `${errorMessage(error)}\n${stderr}`.toLowerCase();
+  return haystack.includes("quota exceeded") || haystack.includes("quota_exceeded");
+}
+
 export async function handleQuotaError(error: unknown): Promise<boolean> {
-  const msg = errorMessage(error).toLowerCase();
-  if (!msg.includes("quota exceeded") && !msg.includes("quota_exceeded")) {
+  if (!isQuotaError(error)) {
     return false;
   }
 
