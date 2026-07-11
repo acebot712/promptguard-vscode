@@ -34,9 +34,15 @@ export async function redactSelectionCommand(
 
         const result = await cli.redactText(selectedText);
 
+        // Log entity types and counts ONLY — never the original PII values.
+        // The output channel is plaintext and can end up in logs/screenshots.
         output.appendLine(`Entities found: ${result.entity_count}`);
+        const countsByType = new Map<string, number>();
         for (const entity of result.entities_found) {
-          output.appendLine(`  • ${entity.type}: ${entity.original} → ${entity.replacement}`);
+          countsByType.set(entity.type, (countsByType.get(entity.type) ?? 0) + 1);
+        }
+        for (const [type, count] of countsByType) {
+          output.appendLine(`  • ${type}: ${count}`);
         }
 
         if (result.entity_count > 0) {

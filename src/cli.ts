@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as child_process from "child_process";
+import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import {
@@ -13,6 +14,52 @@ import {
 import { errorMessage } from "./utils";
 
 const CLI_TIMEOUT_MS = 30000;
+
+/** Argv flags whose values must never appear in logs or error messages. */
+const SENSITIVE_FLAGS = new Set(["--api-key"]);
+
+/**
+ * Redact values of sensitive flags (e.g. `--api-key`) from an argv array so
+ * they never leak into error messages, toasts, or the output channel.
+ * Handles both `--api-key VALUE` and `--api-key=VALUE` forms.
+ */
+export function redactCliArgs(args: string[]): string[] {
+  const redacted: string[] = [];
+  let redactNext = false;
+  for (const arg of args) {
+    if (redactNext) {
+      redacted.push("***REDACTED***");
+      redactNext = false;
+      continue;
+    }
+    const eqIndex = arg.indexOf("=");
+    if (eqIndex > 0 && SENSITIVE_FLAGS.has(arg.slice(0, eqIndex))) {
+      redacted.push(`${arg.slice(0, eqIndex)}=***REDACTED***`);
+      continue;
+    }
+    if (SENSITIVE_FLAGS.has(arg)) {
+      redacted.push(arg);
+      redactNext = true;
+      continue;
+    }
+    redacted.push(arg);
+  }
+  return redacted;
+}
+
+/**
+ * Take the first line of a command's output. On Windows, `where` prints one
+ * match per line; naive trim() keeps interior newlines and produces an
+ * invalid path.
+ */
+export function firstLine(output: string): string {
+  return output.split(/\r?\n/)[0].trim();
+}
+
+interface ExecOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+}
 
 export class CliWrapper {
   private cliPath: string | null = null;
@@ -28,7 +75,7 @@ export class CliWrapper {
 
     try {
       const whichCmd = process.platform === "win32" ? "where" : "which";
-      const foundPath = await this.execRaw(whichCmd, ["promptguard"]);
+      const foundPath = firstLine(await this.execRaw(whichCmd, ["promptguard"]));
       if (foundPath && (await this.isValidBinary(foundPath))) {
         return foundPath;
       }
@@ -101,20 +148,28 @@ export class CliWrapper {
     return foundPath;
   }
 
-  private async executeCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  private async executeCommand(
+    args: string[],
+    options?: ExecOptions,
+  ): Promise<{ stdout: string; stderr: string }> {
     const cliPath = await this.getCliPath();
-    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    const cwd = options?.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    // Sensitive values (API keys) are passed via environment variables, never
+    // argv, so they are invisible to `ps` and never end up in error messages.
+    const env = options?.env ? { ...process.env, ...options.env } : undefined;
 
     return new Promise((resolve, reject) => {
       child_process.execFile(
         cliPath,
         args,
-        { cwd, timeout: CLI_TIMEOUT_MS },
+        { cwd, timeout: CLI_TIMEOUT_MS, env },
         (error, stdout, stderr) => {
           if (error) {
+            // Defense in depth: redact sensitive flag values from the argv we
+            // embed in the error message (they should never be there anyway).
             reject(
               new CliExecutionError(
-                `Command failed: promptguard ${args.join(" ")}`,
+                `Command failed: promptguard ${redactCliArgs(args).join(" ")}`,
                 typeof error.code === "number" ? error.code : undefined,
                 stderr || error.message || "",
                 stdout || "",
@@ -128,8 +183,8 @@ export class CliWrapper {
     });
   }
 
-  private async executeJson<T>(args: string[]): Promise<T> {
-    const { stdout, stderr } = await this.executeCommand(args);
+  private async executeJson<T>(args: string[], options?: ExecOptions): Promise<T> {
+    const { stdout, stderr } = await this.executeCommand(args, options);
     if (stderr && !stdout) {
       throw new CliExecutionError(stderr, undefined, stderr, stdout);
     }
@@ -145,8 +200,25 @@ export class CliWrapper {
     }
   }
 
-  async scan(): Promise<ScanResult> {
-    return this.executeJson<ScanResult>(["scan", "--json"]);
+  /**
+   * Run a CLI command that takes content input, staging the content in a
+   * 0600 temp file passed via `--file` instead of argv. Content on argv is
+   * visible to every process on the machine (`ps`) and breaks on inputs
+   * larger than ARG_MAX.
+   */
+  private async executeJsonWithContent<T>(baseArgs: string[], content: string): Promise<T> {
+    const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "promptguard-"));
+    const filePath = path.join(dir, "input.txt");
+    try {
+      await fs.promises.writeFile(filePath, content, { mode: 0o600 });
+      return await this.executeJson<T>([...baseArgs, "--file", filePath]);
+    } finally {
+      await fs.promises.rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  async scan(cwd?: string): Promise<ScanResult> {
+    return this.executeJson<ScanResult>(["scan", "--json"], { cwd });
   }
 
   async status(): Promise<StatusResult> {
@@ -160,9 +232,13 @@ export class CliWrapper {
     auto?: boolean;
   }): Promise<void> {
     const args = ["init"];
+    const env: Record<string, string> = {};
 
     if (options.apiKey) {
-      args.push("--api-key", options.apiKey);
+      // Never pass the API key as an argv element: argv is world-readable via
+      // `ps` and would be embedded in CliExecutionError messages. The CLI's
+      // auth resolution reads PROMPTGUARD_API_KEY when --api-key is absent.
+      env["PROMPTGUARD_API_KEY"] = options.apiKey;
     }
 
     if (options.provider && options.provider.length > 0) {
@@ -179,7 +255,7 @@ export class CliWrapper {
       args.push("--auto");
     }
 
-    await this.executeCommand(args);
+    await this.executeCommand(args, { env });
   }
 
   async apply(autoConfirm = false): Promise<void> {
@@ -199,11 +275,11 @@ export class CliWrapper {
   }
 
   async detectThreats(text: string): Promise<ThreatDetectionResult> {
-    return this.executeJson<ThreatDetectionResult>(["scan", "--json", "--text", text]);
+    return this.executeJsonWithContent<ThreatDetectionResult>(["scan", "--json"], text);
   }
 
   async redactText(text: string): Promise<RedactResult> {
-    return this.executeJson<RedactResult>(["redact", "--json", "--text", text]);
+    return this.executeJsonWithContent<RedactResult>(["redact", "--json"], text);
   }
 
   async listProjects(): Promise<ProjectListResult> {
