@@ -35,6 +35,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "PromptGuard executes a CLI binary and scans workspace files; it is disabled in untrusted workspaces."
+    }
+  },
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -157,8 +163,9 @@
       "properties": {
         "promptguard.cliPath": {
           "type": "string",
+          "scope": "machine",
           "default": "",
-          "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH."
+          "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH. Machine-scoped: cannot be overridden by workspace settings (a cloned repo must not be able to point this at an arbitrary executable)."
         },
         "promptguard.scanOnSave": {
           "type": "boolean",
@@ -167,6 +174,7 @@
         },
         "promptguard.autoInstallCli": {
           "type": "string",
+          "scope": "machine",
           "enum": [
             "prompt",
             "never",
@@ -224,6 +232,7 @@
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.63.0",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "3.9.2",
     "eslint": "^9.39.5",
     "glob": "^13.0.6",
     "mocha": "^11.7.6",
