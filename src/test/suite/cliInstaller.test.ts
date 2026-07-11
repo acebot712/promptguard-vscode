@@ -14,7 +14,13 @@ suite("CLI Installer Test Suite", () => {
 
   test("Linux asset names", () => {
     assert.strictEqual(getAssetName("linux", "x64"), "promptguard-linux-x86_64");
-    assert.strictEqual(getAssetName("linux", "arm64"), "promptguard-linux-arm64");
+  });
+
+  test("linux/arm64 returns null (release pipeline publishes no such asset)", () => {
+    // Regression: mapping linux/arm64 to "promptguard-linux-arm64" made the
+    // install fail late with "Binary ... not found in release" instead of
+    // the early unsupported-platform message with the manual-install link.
+    assert.strictEqual(getAssetName("linux", "arm64"), null);
   });
 
   test("Windows asset name", () => {

@@ -43,9 +43,10 @@ export function getAssetName(
     if (arch === "x64") {
       return "promptguard-linux-x86_64";
     }
-    if (arch === "arm64") {
-      return "promptguard-linux-arm64";
-    }
+    // linux/arm64: the CLI release pipeline publishes no arm64 Linux asset.
+    // Mapping it to a name anyway would fail late with a confusing "Binary
+    // ... not found in release" error; returning null surfaces the early
+    // "not available for this platform" message with the manual-install link.
   } else if (platform === "win32") {
     return "promptguard-windows-x86_64.exe";
   }
