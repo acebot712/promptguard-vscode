@@ -191,6 +191,29 @@ if (args[0] === "projects" && args[1] === "list") {
 }
 if (args[0] === "status") { emit(FIXTURES.status); process.exit(0); }
 
+if (args[0] === "disable" || args[0] === "enable") {
+  // Mimic the real CLI's confirm prompt: BLOCK reading stdin until EOF
+  // before doing anything. If the wrapper leaves the child's stdin pipe
+  // open, this read never returns, the command hangs until its timeout
+  // SIGTERMs it, and the test fails — exactly the original disable/enable
+  // bug. Completing at all proves the wrapper closed stdin.
+  fs.readFileSync(0, "utf8");
+  if (!args.includes("--yes")) {
+    // The wrapper must take the explicit non-interactive path.
+    process.stderr.write("Error: interactive confirmation required (--yes not passed)\\n");
+    process.exit(1);
+  }
+  console.log(args[0] === "disable" ? "PromptGuard disabled" : "PromptGuard enabled");
+  process.exit(0);
+}
+
+if (args[0] === "apply" || args[0] === "init") {
+  // apply/init also prompt (unless --yes): same stdin-EOF gate as above.
+  fs.readFileSync(0, "utf8");
+  console.log(args[0] + " completed" + (args.includes("--yes") ? " (auto-confirmed)" : ""));
+  process.exit(0);
+}
+
 process.stderr.write("Error: unknown command\\n");
 process.exit(1);
 `;
@@ -351,6 +374,35 @@ suite("CLI Contract Test Suite (stub binary, real exit codes)", function () {
     const cliBrokenProvider = new CliWrapper(() => Promise.reject(new Error("keychain locked")));
     const result = await cliBrokenProvider.detectThreats("TRIGGER_ECHO_KEY");
     assert.strictEqual(result.reason, "PROMPTGUARD_API_KEY_UNSET");
+  });
+
+  // --------------------------------------------------------------------
+  // Mutating / toggling commands (disable, enable, apply, init).
+  // Regression: the CLI's disable/enable block on a stdin confirm prompt;
+  // execFile pipes stdin and never closed it, so the prompt waited forever,
+  // the 30s timeout SIGTERMed the child, and the state never toggled. The
+  // stub's disable/enable branch BLOCKS reading stdin to EOF before exiting,
+  // so these tests only pass because the wrapper closes the child's stdin —
+  // and it exits 1 unless --yes was passed.
+  // --------------------------------------------------------------------
+
+  test("disable(): completes despite a stdin-blocking confirm prompt and passes --yes", async () => {
+    // Resolving at all proves (a) stdin was closed (the stub blocks on it)
+    // and (b) --yes was on argv (the stub exits 1 without it).
+    await cli.disable();
+  });
+
+  test("enable(): completes despite a stdin-blocking confirm prompt and passes --yes", async () => {
+    await cli.enable();
+  });
+
+  test("apply(): completes with stdin closed, both with and without --yes", async () => {
+    await cli.apply(true); // explicit --yes path
+    await cli.apply(false); // prompt path: stub's stdin read must see EOF
+  });
+
+  test("init(): completes with stdin closed", async () => {
+    await cli.init({ auto: true });
   });
 
   test("quota exceeded reported on stderr is recognized by isQuotaError", async () => {

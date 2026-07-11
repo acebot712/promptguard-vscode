@@ -17,10 +17,11 @@ import { errorMessage } from "./utils";
 const CLI_TIMEOUT_MS = 30000;
 
 /**
- * Timeout for mutating commands (apply, init) which rewrite source files
- * across the workspace. On large projects the transformation legitimately
- * takes far longer than a read-only query; killing it mid-write with the
- * 30s read-only timeout leaves the workspace half-transformed.
+ * Timeout for mutating commands (apply, init, disable, enable) which rewrite
+ * or restore source files across the workspace. On large projects the
+ * transformation legitimately takes far longer than a read-only query;
+ * killing it mid-write with the 30s read-only timeout leaves the workspace
+ * half-transformed.
  */
 const MUTATING_CLI_TIMEOUT_MS = 300000;
 
@@ -122,13 +123,15 @@ interface ExecOptions {
   successExitCodes?: readonly number[];
   /**
    * Per-command timeout. Defaults to CLI_TIMEOUT_MS (read-only commands).
-   * Mutating commands (apply, init) pass MUTATING_CLI_TIMEOUT_MS.
+   * Mutating commands (apply, init, disable, enable) pass
+   * MUTATING_CLI_TIMEOUT_MS.
    */
   timeoutMs?: number;
   /**
-   * Marks a command that rewrites workspace files (apply, init). If such a
-   * command is killed by its timeout, the error message tells the user the
-   * workspace may be partially transformed and how to restore it.
+   * Marks a command that rewrites workspace files (apply, init, disable,
+   * enable). If such a command is killed by its timeout, the error message
+   * tells the user the workspace may be partially transformed and how to
+   * restore it.
    */
   mutating?: boolean;
 }
@@ -251,7 +254,7 @@ export class CliWrapper {
     const timeout = options?.timeoutMs ?? CLI_TIMEOUT_MS;
 
     return new Promise((resolve, reject) => {
-      child_process.execFile(
+      const child = child_process.execFile(
         cliPath,
         args,
         { cwd, timeout, env, maxBuffer: MAX_OUTPUT_BUFFER_BYTES },
@@ -291,6 +294,12 @@ export class CliWrapper {
           resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
         },
       );
+      // execFile pipes the child's stdin but never closes it. The CLI's
+      // interactive commands (disable/enable confirm prompts) block reading
+      // stdin, so an open pipe means the prompt waits forever, the timeout
+      // fires, and the command is SIGTERMed without doing anything. Close
+      // stdin immediately: any prompt sees EOF and takes its default.
+      child.stdin?.end();
     });
   }
 
@@ -414,11 +423,24 @@ export class CliWrapper {
   }
 
   async disable(): Promise<void> {
-    await this.executeCommand(["disable"]);
+    // `disable` restores original files from backups (a workspace mutation)
+    // and asks for confirmation on stdin. --yes takes the explicit
+    // non-interactive path; stdin is also closed by executeCommand so a
+    // prompt from an older CLI sees EOF and takes its (yes) default instead
+    // of hanging until the timeout kills it.
+    await this.executeCommand(["disable", "--yes"], {
+      timeoutMs: MUTATING_CLI_TIMEOUT_MS,
+      mutating: true,
+    });
   }
 
   async enable(): Promise<void> {
-    await this.executeCommand(["enable"]);
+    // `enable` re-applies the PromptGuard transformation to source files:
+    // same mutating/confirmation handling as disable.
+    await this.executeCommand(["enable", "--yes"], {
+      timeoutMs: MUTATING_CLI_TIMEOUT_MS,
+      mutating: true,
+    });
   }
 
   async detectThreats(text: string): Promise<ThreatDetectionResult> {
