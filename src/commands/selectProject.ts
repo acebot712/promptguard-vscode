@@ -10,7 +10,14 @@ export async function selectProjectCommand(
   output.show(true);
 
   try {
-    const result = await cli.listProjects();
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Fetching projects…",
+        cancellable: false,
+      },
+      () => cli.listProjects(),
+    );
 
     if (!result.projects || result.projects.length === 0) {
       void vscode.window.showInformationMessage(
@@ -35,7 +42,14 @@ export async function selectProjectCommand(
       return;
     }
 
-    await cli.selectProject(selected.projectId);
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Selecting project…",
+        cancellable: false,
+      },
+      () => cli.selectProject(selected.projectId),
+    );
 
     output.appendLine(`Selected project: ${selected.label} (${selected.projectId})`);
     void vscode.window.showInformationMessage(`PromptGuard project set to "${selected.label}"`);
