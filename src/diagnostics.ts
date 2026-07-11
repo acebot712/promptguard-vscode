@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "./cli";
+import { resolveManagedFileUri } from "./treeView";
 import { ScanResult } from "./types";
 import { SUPPORTED_LANGUAGES } from "./utils";
 
@@ -108,7 +109,9 @@ export class PromptGuardDiagnostics {
     const diagnostics: Map<string, vscode.Diagnostic[]> = new Map();
 
     const addDiagnostic = (filePath: string, diagnostic: vscode.Diagnostic) => {
-      const uri = vscode.Uri.joinPath(folderUri, filePath);
+      // Reuse the tree view's resolver: CLI paths are usually relative to the
+      // scanned folder, but absolute paths must not be joinPath'd onto it.
+      const uri = resolveManagedFileUri(filePath, folderUri);
       const uriString = uri.toString();
       const existing = diagnostics.get(uriString);
       if (existing) {
