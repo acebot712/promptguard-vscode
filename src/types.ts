@@ -41,26 +41,38 @@ export interface StatusResult {
   };
 }
 
+/**
+ * Result of `promptguard scan --json --file/--text` (security threat scan).
+ *
+ * Wire format is defined by `SecurityScanResponse` in the CLI
+ * (promptguard-cli/src/commands/scan.rs): `blocked`, `decision`,
+ * `confidence`, `reason` are emitted as-is; `threat_type`, `event_id`, and
+ * `processing_time_ms` carry serde renames to `threatType`, `eventId`, and
+ * `processingTimeMs`. Optional fields serialize as `null` when absent
+ * (no `skip_serializing_if`).
+ */
 export interface ThreatDetectionResult {
+  blocked: boolean;
   decision: string;
   confidence: number;
-  threat_type?: string;
-  reason?: string;
-  details?: unknown;
+  reason: string;
+  threatType?: string | null;
+  eventId?: string | null;
+  processingTimeMs?: number | null;
 }
 
+/**
+ * Result of `promptguard redact --json`.
+ *
+ * Wire format is defined by `RedactResponse` in the CLI
+ * (promptguard-cli/src/commands/redact.rs): `{ original, redacted,
+ * piiFound }` where `pii_found` carries a serde rename to `piiFound` and is
+ * a plain list of PII type names (not entity objects).
+ */
 export interface RedactResult {
-  redacted_text: string;
-  entities_found: RedactedEntity[];
-  entity_count: number;
-}
-
-export interface RedactedEntity {
-  type: string;
   original: string;
-  replacement: string;
-  start?: number;
-  end?: number;
+  redacted: string;
+  piiFound: string[];
 }
 
 export interface ProjectListResult {

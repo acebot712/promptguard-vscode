@@ -31,9 +31,9 @@ export async function scanFileCommand(
         output.appendLine(`Decision: ${result.decision}`);
         output.appendLine(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
 
-        if (result.decision === "block") {
+        if (result.blocked || result.decision === "block") {
           void vscode.window.showWarningMessage(
-            `Security threat detected in file: ${result.threat_type || "Unknown"}`,
+            `Security threat detected in file: ${result.threatType || "Unknown"}`,
           );
         } else {
           void vscode.window.showInformationMessage("No security threats detected in file.");

@@ -13,11 +13,17 @@ export async function redactSelectionCommand(
   }
 
   const selection = editor.selection;
-  const selectedText = editor.document.getText(selection);
+  const document = editor.document;
+  const selectedText = document.getText(selection);
   if (!selectedText?.trim()) {
     void vscode.window.showWarningMessage("No text selected. Select text to redact PII.");
     return;
   }
+
+  // The redaction round-trips through the network. If the document changes
+  // while we wait, the captured selection Range would point at different
+  // text and we would silently replace the wrong content.
+  const versionAtCapture = document.version;
 
   await vscode.window.withProgress(
     {
@@ -34,23 +40,36 @@ export async function redactSelectionCommand(
 
         const result = await cli.redactText(selectedText);
 
-        // Log entity types and counts ONLY — never the original PII values.
-        // The output channel is plaintext and can end up in logs/screenshots.
-        output.appendLine(`Entities found: ${result.entity_count}`);
-        const countsByType = new Map<string, number>();
-        for (const entity of result.entities_found) {
-          countsByType.set(entity.type, (countsByType.get(entity.type) ?? 0) + 1);
-        }
-        for (const [type, count] of countsByType) {
-          output.appendLine(`  • ${type}: ${count}`);
+        // Log PII types ONLY — never the original PII values. The output
+        // channel is plaintext and can end up in logs/screenshots.
+        // The CLI returns `piiFound` as a list of PII type names
+        // (promptguard-cli/src/commands/redact.rs, RedactResponse).
+        const piiCount = result.piiFound.length;
+        output.appendLine(`PII types found: ${piiCount}`);
+        for (const piiType of result.piiFound) {
+          output.appendLine(`  • ${piiType}`);
         }
 
-        if (result.entity_count > 0) {
-          await editor.edit((editBuilder) => {
-            editBuilder.replace(selection, result.redacted_text);
+        if (piiCount > 0) {
+          if (document.version !== versionAtCapture) {
+            void vscode.window.showErrorMessage(
+              "PromptGuard: The document changed while redacting — no text was replaced. " +
+                "Re-select the text and run the command again.",
+            );
+            return;
+          }
+          const applied = await editor.edit((editBuilder) => {
+            editBuilder.replace(selection, result.redacted);
           });
+          if (!applied) {
+            void vscode.window.showErrorMessage(
+              "PromptGuard: Could not apply the redacted text to the editor. " +
+                "The document may have changed — re-select the text and try again.",
+            );
+            return;
+          }
           void vscode.window.showInformationMessage(
-            `Redacted ${result.entity_count} sensitive entities.`,
+            `Redacted ${piiCount} type(s) of sensitive data.`,
           );
         } else {
           void vscode.window.showInformationMessage(

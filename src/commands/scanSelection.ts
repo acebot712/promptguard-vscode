@@ -36,16 +36,16 @@ export async function scanSelectionCommand(
         output.appendLine(`Decision: ${result.decision}`);
         output.appendLine(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
 
-        if (result.threat_type) {
-          output.appendLine(`Threat Type: ${result.threat_type}`);
+        if (result.threatType) {
+          output.appendLine(`Threat Type: ${result.threatType}`);
         }
         if (result.reason) {
           output.appendLine(`Reason: ${result.reason}`);
         }
 
-        if (result.decision === "block") {
+        if (result.blocked || result.decision === "block") {
           void vscode.window.showWarningMessage(
-            `Security threat detected: ${result.threat_type || "Unknown"} (${(result.confidence * 100).toFixed(0)}% confidence)`,
+            `Security threat detected: ${result.threatType || "Unknown"} (${(result.confidence * 100).toFixed(0)}% confidence)`,
           );
         } else {
           void vscode.window.showInformationMessage(
