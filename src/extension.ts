@@ -132,19 +132,31 @@ export function activate(context: vscode.ExtensionContext): void {
   void (async () => {
     await checkCliInstallation(context, cli, outputChannel);
     void statusBar.updateStatus();
-    void updateContextKeys(cli, contextState);
+    // Resolve cliAvailable BEFORE the first-run notice so we only claim
+    // end-to-end readiness once the CLI is confirmed — otherwise the "ready"
+    // toast could co-exist with checkCliInstallation's "CLI not found" warning.
+    await updateContextKeys(cli, contextState);
     void diagnostics.scanAllWorkspaceFolders();
+    void showFirstRunNotice(context, contextState.cliAvailable);
   })();
 
   outputChannel.appendLine("PromptGuard extension activated");
-
-  void showFirstRunNotice(context);
 }
 
 const FIRST_RUN_NOTICE_KEY = "promptguard.firstRunNoticeShown";
 
-async function showFirstRunNotice(context: vscode.ExtensionContext): Promise<void> {
+async function showFirstRunNotice(
+  context: vscode.ExtensionContext,
+  cliAvailable: boolean,
+): Promise<void> {
   if (context.globalState.get<boolean>(FIRST_RUN_NOTICE_KEY)) {
+    return;
+  }
+  // Don't claim "ready" while the CLI is missing — checkCliInstallation is
+  // already surfacing its own "CLI not found" guidance, and the two toasts
+  // would contradict each other. Leave the flag unset so the notice can still
+  // fire on a later run once the CLI becomes available.
+  if (!cliAvailable) {
     return;
   }
   await context.globalState.update(FIRST_RUN_NOTICE_KEY, true);
