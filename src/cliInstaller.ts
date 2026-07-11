@@ -16,6 +16,12 @@ const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/acebot712/promptguard-cli/releases/latest";
 const GITHUB_USER_AGENT = "PromptGuard-VSCode-Extension";
 const MAX_REDIRECTS = 5;
+/**
+ * Socket inactivity timeout for release-info/checksum/binary downloads.
+ * Without it a stalled connection hangs the (previously non-cancellable)
+ * install progress notification forever.
+ */
+const REQUEST_TIMEOUT_MS = 30000;
 
 /**
  * Map a platform/arch pair to the release asset name published by the CLI's
@@ -96,25 +102,29 @@ function httpsGetFollowRedirects(
         reject(new Error(`Refusing to download PromptGuard CLI from untrusted host: ${host}`));
         return;
       }
-      https
-        .get(
-          requestUrl,
-          { headers: { "User-Agent": GITHUB_USER_AGENT, ...headers } },
-          (response) => {
-            const status = response.statusCode ?? 0;
-            if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
-              response.resume();
-              if (redirectsLeft <= 0) {
-                reject(new Error(`Too many redirects fetching ${url}`));
-                return;
-              }
-              makeRequest(response.headers.location, redirectsLeft - 1);
+      const request = https.get(
+        requestUrl,
+        { headers: { "User-Agent": GITHUB_USER_AGENT, ...headers } },
+        (response) => {
+          const status = response.statusCode ?? 0;
+          if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
+            response.resume();
+            if (redirectsLeft <= 0) {
+              reject(new Error(`Too many redirects fetching ${url}`));
               return;
             }
-            resolve(response);
-          },
-        )
-        .on("error", reject);
+            makeRequest(response.headers.location, redirectsLeft - 1);
+            return;
+          }
+          resolve(response);
+        },
+      );
+      // A stalled socket (no traffic for REQUEST_TIMEOUT_MS) would otherwise
+      // leave the promise pending forever; destroy surfaces it as an error.
+      request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+        request.destroy(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`));
+      });
+      request.on("error", reject);
     };
     makeRequest(url, MAX_REDIRECTS);
   });
@@ -168,7 +178,11 @@ async function downloadText(url: string): Promise<string> {
   return readBody(response);
 }
 
-async function downloadFile(url: string, destPath: string): Promise<void> {
+async function downloadFile(
+  url: string,
+  destPath: string,
+  token?: vscode.CancellationToken,
+): Promise<void> {
   const response = await httpsGetFollowRedirects(url);
 
   if (response.statusCode !== 200) {
@@ -179,16 +193,23 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
     let settled = false;
-    const fail = (err: Error) => {
+    function fail(err: Error): void {
       if (settled) {
         return;
       }
       settled = true;
+      cancelSub?.dispose();
       file.close(() => {
         fs.unlink(destPath, () => {});
         reject(err);
       });
-    };
+    }
+    // User pressed Cancel on the progress notification: tear the transfer
+    // down immediately instead of finishing a download nobody wants.
+    const cancelSub = token?.onCancellationRequested(() => {
+      response.destroy();
+      fail(new Error("Installation cancelled."));
+    });
     // A response stream error would otherwise leave the promise pending
     // forever and a truncated file on disk.
     response.on("error", fail);
@@ -198,6 +219,7 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
         return;
       }
       settled = true;
+      cancelSub?.dispose();
       file.close(() => resolve());
     });
     response.pipe(file);
@@ -250,17 +272,27 @@ export async function installCli(
     {
       location: vscode.ProgressLocation.Notification,
       title: "Installing PromptGuard CLI...",
-      cancellable: false,
+      cancellable: true,
     },
-    async (progress) => {
+    async (progress, token) => {
       const destPath = getInstalledCliPath(context);
-      const tmpPath = `${destPath}.tmp`;
+      const throwIfCancelled = () => {
+        if (token.isCancellationRequested) {
+          throw new Error("Installation cancelled.");
+        }
+      };
+      // Stage the download in a unique per-install directory (a fixed
+      // `<dest>.tmp` path lets two concurrent installs clobber each other's
+      // half-written binary). It lives inside binDir so the final rename
+      // stays same-filesystem and therefore atomic.
+      let tmpDir: string | undefined;
       try {
         progress.report({ message: "Fetching release info..." });
         output.appendLine("Fetching latest release info from GitHub...");
 
         const release = await fetchLatestRelease();
         output.appendLine(`Latest version: ${release.tag_name}`);
+        throwIfCancelled();
 
         const asset = release.assets.find((a) => a.name === assetName);
         if (!asset) {
@@ -280,13 +312,17 @@ export async function installCli(
 
         const binDir = getCliInstallDir(context);
         await mkdir(binDir, { recursive: true });
+        tmpDir = await fs.promises.mkdtemp(path.join(binDir, ".install-"));
+        const tmpPath = path.join(tmpDir, path.basename(destPath));
 
         // Download to a temp path first so a failed/truncated download can
         // never be mistaken for a valid install.
-        await downloadFile(asset.browser_download_url, tmpPath);
+        await downloadFile(asset.browser_download_url, tmpPath, token);
+        throwIfCancelled();
 
         progress.report({ message: "Verifying checksum..." });
         const checksumContent = await downloadText(checksumAsset.browser_download_url);
+        throwIfCancelled();
         const expected = parseSha256File(checksumContent, assetName);
         if (!expected) {
           throw new Error(`Could not parse expected checksum from ${assetName}.sha256`);
@@ -308,6 +344,7 @@ export async function installCli(
 
         progress.report({ message: "Validating binary..." });
         await validateBinary(tmpPath);
+        throwIfCancelled();
 
         await fs.promises.rename(tmpPath, destPath);
 
@@ -322,12 +359,15 @@ export async function installCli(
 
         return destPath;
       } catch (error) {
-        await fs.promises.rm(tmpPath, { force: true }).catch(() => {});
         output.appendLine(`Installation failed: ${errorMessage(error)}`);
         void vscode.window.showErrorMessage(
           `Failed to install PromptGuard CLI: ${errorMessage(error)}`,
         );
         return null;
+      } finally {
+        if (tmpDir) {
+          await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+        }
       }
     },
   );
