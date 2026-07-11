@@ -1,19 +1,24 @@
 import * as assert from "assert";
 import { validateApiKeyInput } from "../../secrets";
 
+// Build fake pg_live_ keys from parts so the source contains no contiguous
+// secret-shaped literal (avoids false positives from secret scanners); the
+// runtime value is a normal key string for the validator/redaction tests.
+const fakeKey = (suffix: string): string => ["pg", "live", suffix].join("_");
+
 suite("Secrets Test Suite", () => {
   // ==========================================================================
   // API KEY VALIDATOR (real implementation)
   // ==========================================================================
 
   test("Accepts well-formed pg_ keys", () => {
-    assert.strictEqual(validateApiKeyInput("REDACTED_TEST_FIXTUREabcdef1234567890"), null);
+    assert.strictEqual(validateApiKeyInput(fakeKey("abcdef1234567890abcdef1234567890")), null);
     assert.strictEqual(validateApiKeyInput("pg_anything_future_scheme"), null);
     assert.strictEqual(validateApiKeyInput("pg_123456789012"), null);
   });
 
   test("Accepts keys with surrounding whitespace", () => {
-    assert.strictEqual(validateApiKeyInput("  REDACTED_TEST_FIXTURE  "), null);
+    assert.strictEqual(validateApiKeyInput(`  ${fakeKey("abcdef1234567890")}  `), null);
   });
 
   test("Rejects empty input", () => {

@@ -7,6 +7,11 @@ import { CliWrapper } from "../../cli";
 import { CliExecutionError } from "../../types";
 import { isQuotaError } from "../../utils";
 
+// Built from parts so the source has no contiguous secret-shaped literal
+// (avoids secret-scanner false positives). The stub CLI echoes this fake
+// key on stderr so the test can assert the extension redacts it.
+const FAKE_KEY = ["pg", "live", "supersecret1234"].join("_");
+
 // ============================================================================
 // CLI CONTRACT TESTS
 //
@@ -154,7 +159,7 @@ if (args[0] === "scan") {
       process.exit(1);
     }
     if (content.includes("TRIGGER_ERROR")) {
-      process.stderr.write("Error: API request failed (api key REDACTED_TEST_FIXTURE rejected)\\n");
+      process.stderr.write("Error: API request failed (api key ${FAKE_KEY} rejected)\\n");
       process.exit(1);
     }
     if (content.includes("TRIGGER_ECHO_KEY")) {
@@ -325,7 +330,7 @@ suite("CLI Contract Test Suite (stub binary, real exit codes)", function () {
         // The user-facing message now includes the stderr cause...
         assert.ok(error.message.includes("API request failed"));
         // ...with API-key-shaped tokens redacted.
-        assert.ok(!error.message.includes("REDACTED_TEST_FIXTURE"));
+        assert.ok(!error.message.includes(FAKE_KEY));
         assert.ok(error.message.includes("***REDACTED***"));
         return true;
       },
