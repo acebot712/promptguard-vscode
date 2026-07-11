@@ -1,5 +1,6 @@
 import * as assert from "assert";
-import { firstLine, redactCliArgs } from "../../cli";
+import { firstLine, redactCliArgs, sanitizeCliOutputLine } from "../../cli";
+import { isQuotaError } from "../../utils";
 import { CliExecutionError } from "../../types";
 
 suite("CLI Wrapper Test Suite", () => {
@@ -71,5 +72,60 @@ suite("CLI Wrapper Test Suite", () => {
 
   test("firstLine of single-line output is the trimmed line", () => {
     assert.strictEqual(firstLine("/usr/local/bin/promptguard"), "/usr/local/bin/promptguard");
+  });
+
+  // ==========================================================================
+  // STDERR SANITIZATION (user-facing error toasts include a cause line but
+  // must never leak API-key-shaped tokens)
+  // ==========================================================================
+
+  test("sanitizeCliOutputLine keeps only the first line", () => {
+    assert.strictEqual(
+      sanitizeCliOutputLine("Error: request failed\nstack line 1\nstack line 2"),
+      "Error: request failed",
+    );
+  });
+
+  test("sanitizeCliOutputLine redacts pg_ key-shaped tokens", () => {
+    const line = sanitizeCliOutputLine("Error: key REDACTED_TEST_FIXTURE was rejected");
+    assert.ok(!line.includes("REDACTED_TEST_FIXTURE"));
+    assert.ok(line.includes("***REDACTED***"));
+  });
+
+  test("sanitizeCliOutputLine redacts values passed to --api-key", () => {
+    const line = sanitizeCliOutputLine("invalid value for --api-key=" + "oddformat");
+    assert.ok(!line.includes("oddformat"));
+    assert.ok(line.includes("--api-key=***REDACTED***"));
+  });
+
+  test("sanitizeCliOutputLine leaves ordinary errors untouched", () => {
+    assert.strictEqual(
+      sanitizeCliOutputLine("Error: Failed to read file 'x.txt'"),
+      "Error: Failed to read file 'x.txt'",
+    );
+  });
+
+  // ==========================================================================
+  // QUOTA ERROR DETECTION (regression: the CLI reports quota errors on
+  // stderr; matching only error.message never fired the upgrade prompt)
+  // ==========================================================================
+
+  test("isQuotaError matches quota text in CliExecutionError.stderr", () => {
+    const error = new CliExecutionError(
+      "Command failed: promptguard scan --json",
+      1,
+      "Error: API error 429: quota exceeded for plan 'free'",
+      "",
+    );
+    assert.strictEqual(isQuotaError(error), true);
+  });
+
+  test("isQuotaError matches quota_exceeded in the message", () => {
+    assert.strictEqual(isQuotaError(new Error("api returned QUOTA_EXCEEDED")), true);
+  });
+
+  test("isQuotaError is false for unrelated errors", () => {
+    assert.strictEqual(isQuotaError(new CliExecutionError("boom", 1, "Error: timeout", "")), false);
+    assert.strictEqual(isQuotaError(new Error("connection refused")), false);
   });
 });
