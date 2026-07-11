@@ -90,4 +90,31 @@ suite("Status Bar Test Suite", () => {
     assert.ok(statusBar.text.includes("Unavailable"), `unexpected text: ${statusBar.text}`);
     assert.ok(tooltipText(statusBar).includes("CLI not found"));
   });
+
+  test("a slow older update does not repaint over a newer result", async () => {
+    // The first (slow) call resolves 'active' after the second (fast) call
+    // resolves 'disabled'. Completion order is reversed from start order, so
+    // without a generation guard the stale 'active' would win.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let call = 0;
+    const cli = stubCli(async () => {
+      call += 1;
+      if (call === 1) {
+        await gate; // first call blocks until we let it finish, last
+        return { initialized: true, status: "active", proxy_url: "https://old" };
+      }
+      return { initialized: true, status: "disabled" };
+    });
+    statusBar = new PromptGuardStatusBar(cli);
+
+    const first = statusBar.updateStatus(); // starts, blocks on gate
+    await statusBar.updateStatus(); // starts and finishes second → 'Disabled'
+    release(); // now let the older call resolve
+    await first;
+
+    assert.ok(statusBar.text.includes("Disabled"), `newer result must win; got: ${statusBar.text}`);
+  });
 });

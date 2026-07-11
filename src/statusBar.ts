@@ -6,6 +6,14 @@ import { errorMessage } from "./utils";
 export class PromptGuardStatusBar {
   private statusBarItem: vscode.StatusBarItem;
   private cli: CliWrapper;
+  /**
+   * Monotonic update generation. updateStatus() is fired from several
+   * overlapping sites (config change, save-debounce, refreshUI); each call
+   * captures the counter at start and discards its result if a newer update
+   * has since begun, so a slower older cli.status() can't repaint the bar
+   * with stale state. Mirrors PromptGuardDiagnostics.scanGeneration.
+   */
+  private updateGeneration = 0;
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
@@ -27,10 +35,15 @@ export class PromptGuardStatusBar {
   }
 
   async updateStatus(): Promise<void> {
+    const generation = ++this.updateGeneration;
     try {
       const status = await this.cli.status();
+      // A newer update started while this cli.status() was in flight — drop
+      // this (older, possibly stale) result rather than repaint over it.
+      if (generation !== this.updateGeneration) return;
       this.updateStatusBarItem(status);
     } catch (error) {
+      if (generation !== this.updateGeneration) return;
       // "Not initialized" is reserved for a genuine CLI answer
       // ({"initialized": false}, which `status --json` reports with exit 0).
       // A thrown error here means we could not get an answer at all — CLI
