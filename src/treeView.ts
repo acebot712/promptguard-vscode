@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { CliWrapper } from "./cli";
 import { StatusResult } from "./types";
 
@@ -13,7 +14,28 @@ class CategoryTreeItem extends vscode.TreeItem {
   }
 }
 
-function createFileItem(filePath: string, isProtected: boolean): vscode.TreeItem {
+/**
+ * Resolve a managed-file path from CLI output to an openable URI. The CLI
+ * reports paths relative to the project root, so relative paths must be
+ * joined against the workspace folder — Uri.file() on a relative path yields
+ * a broken URI and click-to-open fails. Exported for tests.
+ */
+export function resolveManagedFileUri(
+  filePath: string,
+  workspaceFolderUri?: vscode.Uri,
+): vscode.Uri {
+  if (path.isAbsolute(filePath) || !workspaceFolderUri) {
+    return vscode.Uri.file(filePath);
+  }
+  return vscode.Uri.joinPath(workspaceFolderUri, filePath);
+}
+
+/** Exported for tests. */
+export function createFileItem(
+  filePath: string,
+  isProtected: boolean,
+  workspaceFolderUri?: vscode.Uri,
+): vscode.TreeItem {
   const item = new vscode.TreeItem(filePath, vscode.TreeItemCollapsibleState.None);
   item.tooltip = isProtected
     ? `${filePath} - Protected by PromptGuard`
@@ -25,7 +47,7 @@ function createFileItem(filePath: string, isProtected: boolean): vscode.TreeItem
   item.command = {
     command: "vscode.open",
     title: "Open File",
-    arguments: [vscode.Uri.file(filePath)],
+    arguments: [resolveManagedFileUri(filePath, workspaceFolderUri)],
   };
   return item;
 }
@@ -116,8 +138,12 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
       items.push(new CategoryTreeItem("Status", statusItems, "info"));
 
       if (status.configuration?.managed_files && status.configuration.managed_files.length > 0) {
+        // The CLI's `status` runs with cwd = first workspace folder (see
+        // CliWrapper.executeCommand), so relative managed-file paths resolve
+        // against that folder.
+        const workspaceFolderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
         const fileItems = status.configuration.managed_files.map((file) =>
-          createFileItem(file, true),
+          createFileItem(file, true, workspaceFolderUri),
         );
         items.push(new CategoryTreeItem(`Managed Files (${fileItems.length})`, fileItems, "files"));
       }

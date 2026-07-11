@@ -11,7 +11,8 @@ export class PromptGuardStatusBar {
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     this.statusBarItem.command = "promptguard.status";
     this.statusBarItem.tooltip = "Click to view PromptGuard status";
-    void this.updateStatus();
+    // No eager updateStatus() here: extension.ts triggers the first update
+    // after CLI resolution completes, so we don't spawn the CLI prematurely.
   }
 
   async updateStatus(): Promise<void> {

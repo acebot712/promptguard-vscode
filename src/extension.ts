@@ -18,14 +18,15 @@ import { scanFileCommand } from "./commands/scanFile";
 import { setApiKeyCommand } from "./commands/setApiKey";
 import { selectProjectCommand } from "./commands/selectProject";
 import { installCliCommand } from "./commands/installCli";
+import { SUPPORTED_LANGUAGES } from "./utils";
+
+const STATUS_SAVE_DEBOUNCE_MS = 5000;
 
 export function activate(context: vscode.ExtensionContext): void {
   const secrets = new SecretsManager(context);
   const cli = new CliWrapper();
   const outputChannel = vscode.window.createOutputChannel("PromptGuard");
   context.subscriptions.push(outputChannel);
-
-  void checkCliInstallation(context, cli, outputChannel);
 
   const diagnostics = new PromptGuardDiagnostics(cli);
   diagnostics.activate(context);
@@ -74,22 +75,58 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
+  // Debounce status-bar refreshes on save: updateStatus() spawns the CLI, so
+  // running it on every save (of any file type) is wasteful and noisy.
+  let statusSaveTimer: NodeJS.Timeout | undefined;
+  context.subscriptions.push(
+    new vscode.Disposable(() => {
+      if (statusSaveTimer) {
+        clearTimeout(statusSaveTimer);
+        statusSaveTimer = undefined;
+      }
+    }),
+  );
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void statusBar.updateStatus();
     }),
-    vscode.workspace.onDidSaveTextDocument(() => {
-      void statusBar.updateStatus();
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      if (!SUPPORTED_LANGUAGES.includes(document.languageId)) {
+        return;
+      }
+      if (statusSaveTimer) {
+        clearTimeout(statusSaveTimer);
+      }
+      statusSaveTimer = setTimeout(() => {
+        statusSaveTimer = undefined;
+        void statusBar.updateStatus();
+      }, STATUS_SAVE_DEBOUNCE_MS);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("promptguard.cliPath")) {
         cli.resetCache();
         void statusBar.updateStatus();
+        void diagnostics.scanAllWorkspaceFolders();
       }
     }),
   );
 
-  void statusBar.updateStatus();
+  if ((vscode.workspace.workspaceFolders?.length ?? 0) > 1) {
+    outputChannel.appendLine(
+      "Multi-root workspace detected: SDK diagnostics cover every folder; the status bar and " +
+        "tree view reflect the first workspace folder only.",
+    );
+  }
+
+  // Resolve/install the CLI BEFORE the first scan so the initial scan does not
+  // race CLI installation and silently no-op.
+  void (async () => {
+    await checkCliInstallation(context, cli, outputChannel);
+    void statusBar.updateStatus();
+    void diagnostics.scanAllWorkspaceFolders();
+  })();
+
   outputChannel.appendLine("PromptGuard extension activated");
 
   void showFirstRunNotice(context);
@@ -112,64 +149,71 @@ async function checkCliInstallation(
   cli: CliWrapper,
   output: vscode.OutputChannel,
 ): Promise<void> {
-  try {
-    await cli.findCliBinary();
+  // findCliBinary() resolves to null (it does not throw) when nothing is found.
+  const foundPath = await cli.findCliBinary().catch(() => null);
+  if (foundPath) {
     output.appendLine("PromptGuard CLI found");
-  } catch {
-    if (isCliInstalled(context)) {
-      const installedPath = getInstalledCliPath(context);
-      const config = vscode.workspace.getConfiguration("promptguard");
-      await config.update("cliPath", installedPath, vscode.ConfigurationTarget.Global);
-      output.appendLine(`Using installed CLI at: ${installedPath}`);
-      cli.resetCache();
-      return;
-    }
+    return;
+  }
 
-    const autoInstall = vscode.workspace
-      .getConfiguration("promptguard")
-      .get<string>("autoInstallCli", "prompt");
+  if (isCliInstalled(context)) {
+    const installedPath = getInstalledCliPath(context);
+    const config = vscode.workspace.getConfiguration("promptguard");
+    await config.update("cliPath", installedPath, vscode.ConfigurationTarget.Global);
+    output.appendLine(`Using installed CLI at: ${installedPath}`);
+    cli.resetCache();
+    return;
+  }
 
-    if (autoInstall === "never") {
-      output.appendLine(
-        "PromptGuard CLI not found. Auto-install is disabled (promptguard.autoInstallCli=never). " +
-          "Set 'promptguard.cliPath' to the binary location.",
-      );
-      return;
-    }
+  const autoInstall = vscode.workspace
+    .getConfiguration("promptguard")
+    .get<string>("autoInstallCli", "prompt");
 
-    if (autoInstall === "auto") {
-      output.appendLine(
-        "PromptGuard CLI not found. Installing silently (promptguard.autoInstallCli=auto)...",
-      );
-      const installedPath = await installCli(context, output);
-      if (installedPath) {
-        cli.resetCache();
-      }
-      return;
-    }
-
-    const result = await vscode.window.showWarningMessage(
-      "PromptGuard CLI not found. Would you like to install it automatically?",
-      "Install Now",
-      "Install Manually",
-      "Configure Path",
+  if (autoInstall === "never") {
+    output.appendLine(
+      "PromptGuard CLI not found. Auto-install is disabled (promptguard.autoInstallCli=never). " +
+        "Set 'promptguard.cliPath' to the binary location.",
     );
+    return;
+  }
 
-    if (result === "Install Now") {
-      const installedPath = await installCli(context, output);
-      if (installedPath) {
-        cli.resetCache();
-      }
-    } else if (result === "Install Manually") {
-      const terminal = vscode.window.createTerminal("PromptGuard Install");
-      terminal.show();
-      terminal.sendText(
-        "curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh",
-      );
-      output.appendLine("Opened terminal to install PromptGuard CLI");
-    } else if (result === "Configure Path") {
-      void vscode.commands.executeCommand("workbench.action.openSettings", "promptguard.cliPath");
+  if (autoInstall === "auto") {
+    output.appendLine(
+      "PromptGuard CLI not found. Installing silently (promptguard.autoInstallCli=auto)...",
+    );
+    const installedPath = await installCli(context, output);
+    if (installedPath) {
+      cli.resetCache();
     }
+    return;
+  }
+
+  const result = await vscode.window.showWarningMessage(
+    "PromptGuard CLI not found. Would you like to install it automatically?",
+    "Install Now",
+    "Install Manually",
+    "Configure Path",
+  );
+
+  if (result === "Install Now") {
+    const installedPath = await installCli(context, output);
+    if (installedPath) {
+      cli.resetCache();
+    }
+  } else if (result === "Install Manually") {
+    const terminal = vscode.window.createTerminal("PromptGuard Install");
+    terminal.show();
+    // Pre-fill the command WITHOUT executing it (addNewLine=false): the user
+    // reviews the curl|sh line and presses Enter themselves.
+    terminal.sendText(
+      "curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh",
+      false,
+    );
+    output.appendLine(
+      "Opened terminal with the install command pre-filled. Review it and press Enter to run.",
+    );
+  } else if (result === "Configure Path") {
+    void vscode.commands.executeCommand("workbench.action.openSettings", "promptguard.cliPath");
   }
 }
 
