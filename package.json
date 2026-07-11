@@ -153,7 +153,7 @@
       "explorer/context": [
         {
           "command": "promptguard.scanFile",
-          "when": "resourceLangId == typescript || resourceLangId == javascript || resourceLangId == python",
+          "when": "resourceLangId == typescript || resourceLangId == typescriptreact || resourceLangId == javascript || resourceLangId == javascriptreact || resourceLangId == python",
           "group": "promptguard@1"
         }
       ]
@@ -189,29 +189,7 @@
           "description": "Behavior when the PromptGuard CLI is not found on first run: prompt (ask), never (do nothing), or auto (install silently)."
         }
       }
-    },
-    "languages": [
-      {
-        "id": "typescript",
-        "extensions": [
-          ".ts",
-          ".tsx"
-        ]
-      },
-      {
-        "id": "javascript",
-        "extensions": [
-          ".js",
-          ".jsx"
-        ]
-      },
-      {
-        "id": "python",
-        "extensions": [
-          ".py"
-        ]
-      }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
