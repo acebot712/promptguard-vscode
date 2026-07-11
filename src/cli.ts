@@ -13,7 +13,26 @@ import {
 } from "./types";
 import { errorMessage } from "./utils";
 
+/** Timeout for read-only commands (scan, status, --version, ...). */
 const CLI_TIMEOUT_MS = 30000;
+
+/**
+ * Timeout for mutating commands (apply, init) which rewrite source files
+ * across the workspace. On large projects the transformation legitimately
+ * takes far longer than a read-only query; killing it mid-write with the
+ * 30s read-only timeout leaves the workspace half-transformed.
+ */
+const MUTATING_CLI_TIMEOUT_MS = 300000;
+
+/**
+ * Appended to the error message when a mutating command is killed by its
+ * timeout: the workspace may be left partially transformed, and the user
+ * needs to know how to get back to a clean state.
+ */
+const MUTATION_TIMEOUT_HINT =
+  "The command was killed by a timeout, so the workspace may be partially " +
+  "transformed. Run 'PromptGuard: Disable' (promptguard disable) to restore " +
+  "the original files from backups.";
 
 /** Argv flags whose values must never appear in logs or error messages. */
 const SENSITIVE_FLAGS = new Set(["--api-key"]);
@@ -91,6 +110,17 @@ interface ExecOptions {
    * Used for `scan`, where exit 2 = findings/block with full JSON on stdout.
    */
   successExitCodes?: readonly number[];
+  /**
+   * Per-command timeout. Defaults to CLI_TIMEOUT_MS (read-only commands).
+   * Mutating commands (apply, init) pass MUTATING_CLI_TIMEOUT_MS.
+   */
+  timeoutMs?: number;
+  /**
+   * Marks a command that rewrites workspace files (apply, init). If such a
+   * command is killed by its timeout, the error message tells the user the
+   * workspace may be partially transformed and how to restore it.
+   */
+  mutating?: boolean;
 }
 
 export class CliWrapper {
@@ -189,12 +219,13 @@ export class CliWrapper {
     // Sensitive values (API keys) are passed via environment variables, never
     // argv, so they are invisible to `ps` and never end up in error messages.
     const env = options?.env ? { ...process.env, ...options.env } : undefined;
+    const timeout = options?.timeoutMs ?? CLI_TIMEOUT_MS;
 
     return new Promise((resolve, reject) => {
       child_process.execFile(
         cliPath,
         args,
-        { cwd, timeout: CLI_TIMEOUT_MS, env, maxBuffer: MAX_OUTPUT_BUFFER_BYTES },
+        { cwd, timeout, env, maxBuffer: MAX_OUTPUT_BUFFER_BYTES },
         (error, stdout, stderr) => {
           if (error) {
             const exitCode = typeof error.code === "number" ? error.code : undefined;
@@ -211,9 +242,16 @@ export class CliWrapper {
             // Include a sanitized first line of stderr so the user-facing
             // toast explains WHY the command failed, not just that it did.
             const detail = stderr ? ` — ${sanitizeCliOutputLine(stderr)}` : "";
+            // execFile sets `killed` when it terminated the child itself,
+            // which for our options means the timeout fired. For a command
+            // that rewrites workspace files, that is not just a failure: the
+            // workspace may be mid-transformation.
+            const timedOut = error.killed === true && exitCode === undefined;
+            const timeoutDetail = timedOut ? ` — timed out after ${timeout / 1000}s` : "";
+            const mutationHint = timedOut && options?.mutating ? ` ${MUTATION_TIMEOUT_HINT}` : "";
             reject(
               new CliExecutionError(
-                `Command failed: promptguard ${redactCliArgs(args).join(" ")}${detail}`,
+                `Command failed: promptguard ${redactCliArgs(args).join(" ")}${timeoutDetail}${detail}${mutationHint}`,
                 exitCode,
                 stderr || error.message || "",
                 stdout || "",
@@ -230,7 +268,9 @@ export class CliWrapper {
   private async executeJson<T>(args: string[], options?: ExecOptions): Promise<T> {
     const { stdout, stderr } = await this.executeCommand(args, options);
     if (stderr && !stdout) {
-      throw new CliExecutionError(stderr, undefined, stderr, stdout);
+      // The message may surface in a toast: show only a sanitized first line.
+      // The raw stderr stays available on the .stderr property.
+      throw new CliExecutionError(sanitizeCliOutputLine(stderr), undefined, stderr, stdout);
     }
     try {
       return JSON.parse(stdout) as T;
@@ -307,7 +347,12 @@ export class CliWrapper {
       args.push("--auto");
     }
 
-    await this.executeCommand(args, { env });
+    // `init` rewrites source files: give it the long mutating timeout.
+    await this.executeCommand(args, {
+      env,
+      timeoutMs: MUTATING_CLI_TIMEOUT_MS,
+      mutating: true,
+    });
   }
 
   async apply(autoConfirm = false): Promise<void> {
@@ -315,7 +360,11 @@ export class CliWrapper {
     if (autoConfirm) {
       args.push("--yes");
     }
-    await this.executeCommand(args);
+    // `apply` rewrites source files: give it the long mutating timeout.
+    await this.executeCommand(args, {
+      timeoutMs: MUTATING_CLI_TIMEOUT_MS,
+      mutating: true,
+    });
   }
 
   async disable(): Promise<void> {
