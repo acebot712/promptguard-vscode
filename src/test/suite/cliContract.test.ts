@@ -157,6 +157,12 @@ if (args[0] === "scan") {
       process.stderr.write("Error: API request failed (api key REDACTED_TEST_FIXTURE rejected)\\n");
       process.exit(1);
     }
+    if (content.includes("TRIGGER_ECHO_KEY")) {
+      // Echo the API key env var back through the JSON \`reason\` field so
+      // tests can assert what credential the CLI process actually saw.
+      emit({ ...FIXTURES.allowed, reason: process.env.PROMPTGUARD_API_KEY || "PROMPTGUARD_API_KEY_UNSET" });
+      process.exit(0);
+    }
     if (content.includes("ignore previous instructions")) {
       emit(FIXTURES.blocked);
       process.exit(2); // EXIT_FINDINGS: blocked, JSON still on stdout
@@ -168,7 +174,21 @@ if (args[0] === "scan") {
   process.exit(2); // EXIT_FINDINGS: SDK usage found, JSON still on stdout
 }
 
-if (args[0] === "redact") { emit(FIXTURES.redact); process.exit(0); }
+if (args[0] === "redact") {
+  const file = flagValue("--file");
+  const content = file ? fs.readFileSync(file, "utf8") : "";
+  if (content.includes("TRIGGER_ECHO_KEY")) {
+    emit({ original: content, redacted: process.env.PROMPTGUARD_API_KEY || "PROMPTGUARD_API_KEY_UNSET", piiFound: [] });
+    process.exit(0);
+  }
+  emit(FIXTURES.redact);
+  process.exit(0);
+}
+if (args[0] === "projects" && args[1] === "list") {
+  // \`active_project\` echoes the API key env var for the key-plumbing tests.
+  emit({ projects: [{ id: "p1", name: "demo" }], active_project: process.env.PROMPTGUARD_API_KEY || "PROMPTGUARD_API_KEY_UNSET" });
+  process.exit(0);
+}
 if (args[0] === "status") { emit(FIXTURES.status); process.exit(0); }
 
 process.stderr.write("Error: unknown command\\n");
@@ -192,11 +212,18 @@ suite("CLI Contract Test Suite (stub binary, real exit codes)", function () {
   let stubPath: string;
   let cli: CliWrapper;
   let previousCliPath: string | undefined;
+  let previousEnvApiKey: string | undefined;
 
   suiteSetup(async () => {
     stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "pg-stub-"));
     stubPath = path.join(stubDir, "promptguard");
     fs.writeFileSync(stubPath, buildStubScript(), { mode: 0o755 });
+
+    // The key-plumbing tests assert on the CHILD's PROMPTGUARD_API_KEY, which
+    // is inherited from this process when the wrapper does not inject one —
+    // so clear any ambient value for deterministic results.
+    previousEnvApiKey = process.env["PROMPTGUARD_API_KEY"];
+    delete process.env["PROMPTGUARD_API_KEY"];
 
     const config = vscode.workspace.getConfiguration("promptguard");
     previousCliPath = config.get<string>("cliPath");
@@ -208,6 +235,9 @@ suite("CLI Contract Test Suite (stub binary, real exit codes)", function () {
     const config = vscode.workspace.getConfiguration("promptguard");
     await config.update("cliPath", previousCliPath || undefined, vscode.ConfigurationTarget.Global);
     fs.rmSync(stubDir, { recursive: true, force: true });
+    if (previousEnvApiKey !== undefined) {
+      process.env["PROMPTGUARD_API_KEY"] = previousEnvApiKey;
+    }
   });
 
   test("scan(): exit 2 with SDK findings resolves with the parsed report", async () => {
@@ -277,6 +307,50 @@ suite("CLI Contract Test Suite (stub binary, real exit codes)", function () {
         return true;
       },
     );
+  });
+
+  // --------------------------------------------------------------------
+  // Stored-API-key plumbing: a key saved via "Set API Key" (SecretStorage)
+  // must reach API-backed CLI invocations as PROMPTGUARD_API_KEY.
+  // Regression: detectThreats/redactText/listProjects spawned the CLI with
+  // no env, so a user who only ran "Set API Key" got "No API key found".
+  // --------------------------------------------------------------------
+
+  const STORED_KEY = "pg_test_stored_key_123456";
+
+  test("detectThreats(): stored API key is passed to the CLI as PROMPTGUARD_API_KEY", async () => {
+    const cliWithKey = new CliWrapper(() => Promise.resolve(STORED_KEY));
+    const result = await cliWithKey.detectThreats("TRIGGER_ECHO_KEY");
+    assert.strictEqual(result.reason, STORED_KEY);
+  });
+
+  test("redactText(): stored API key is passed to the CLI as PROMPTGUARD_API_KEY", async () => {
+    const cliWithKey = new CliWrapper(() => Promise.resolve(STORED_KEY));
+    const result = await cliWithKey.redactText("TRIGGER_ECHO_KEY");
+    assert.strictEqual(result.redacted, STORED_KEY);
+  });
+
+  test("listProjects(): stored API key is passed to the CLI as PROMPTGUARD_API_KEY", async () => {
+    const cliWithKey = new CliWrapper(() => Promise.resolve(STORED_KEY));
+    const result = await cliWithKey.listProjects();
+    assert.strictEqual(result.active_project, STORED_KEY);
+  });
+
+  test("no stored key: PROMPTGUARD_API_KEY is not set, CLI's own chain applies", async () => {
+    const cliNoKey = new CliWrapper(() => Promise.resolve(undefined));
+    const result = await cliNoKey.detectThreats("TRIGGER_ECHO_KEY");
+    assert.strictEqual(result.reason, "PROMPTGUARD_API_KEY_UNSET");
+  });
+
+  test("no key provider at all (default construction) leaves the env untouched", async () => {
+    const result = await cli.detectThreats("TRIGGER_ECHO_KEY");
+    assert.strictEqual(result.reason, "PROMPTGUARD_API_KEY_UNSET");
+  });
+
+  test("a failing SecretStorage provider does not break the command", async () => {
+    const cliBrokenProvider = new CliWrapper(() => Promise.reject(new Error("keychain locked")));
+    const result = await cliBrokenProvider.detectThreats("TRIGGER_ECHO_KEY");
+    assert.strictEqual(result.reason, "PROMPTGUARD_API_KEY_UNSET");
   });
 
   test("quota exceeded reported on stderr is recognized by isQuotaError", async () => {

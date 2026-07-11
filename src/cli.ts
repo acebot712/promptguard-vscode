@@ -106,6 +106,16 @@ interface ExecOptions {
   cwd?: string;
   env?: Record<string, string>;
   /**
+   * Marks a command that calls the PromptGuard API and therefore needs an
+   * API key (scan --file, redact, projects ...). When set and the injected
+   * key provider (VS Code SecretStorage, populated by "Set API Key") returns
+   * a key, it is supplied to the CLI via PROMPTGUARD_API_KEY — so running
+   * "Set API Key" alone is enough to use API-backed commands. When no key is
+   * stored, the environment is left untouched and the CLI falls back to its
+   * own credential chain (env var / config / keyring).
+   */
+  apiBacked?: boolean;
+  /**
    * Non-zero exit codes that still mean "command succeeded, parse stdout".
    * Used for `scan`, where exit 2 = findings/block with full JSON on stdout.
    */
@@ -123,8 +133,18 @@ interface ExecOptions {
   mutating?: boolean;
 }
 
+/**
+ * Supplies the API key stored via "PromptGuard: Set API Key" (VS Code
+ * SecretStorage). Injected at construction so the wrapper never depends on
+ * SecretStorage directly. Returning undefined means "no stored key" and the
+ * CLI's own credential chain applies.
+ */
+export type ApiKeyProvider = () => Promise<string | undefined>;
+
 export class CliWrapper {
   private cliPath: string | null = null;
+
+  constructor(private readonly storedApiKeyProvider?: ApiKeyProvider) {}
 
   async findCliBinary(): Promise<string | null> {
     const config = vscode.workspace.getConfiguration("promptguard");
@@ -218,7 +238,16 @@ export class CliWrapper {
     const cwd = options?.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
     // Sensitive values (API keys) are passed via environment variables, never
     // argv, so they are invisible to `ps` and never end up in error messages.
-    const env = options?.env ? { ...process.env, ...options.env } : undefined;
+    // For API-backed commands, the key stored via "Set API Key" is injected
+    // here; explicit options.env still wins (e.g. init passing a
+    // freshly-entered key).
+    const storedApiKey = options?.apiBacked ? await this.resolveStoredApiKey() : undefined;
+    let env: NodeJS.ProcessEnv | undefined = options?.env
+      ? { ...process.env, ...options.env }
+      : undefined;
+    if (storedApiKey) {
+      env = { ...process.env, PROMPTGUARD_API_KEY: storedApiKey, ...options?.env };
+    }
     const timeout = options?.timeoutMs ?? CLI_TIMEOUT_MS;
 
     return new Promise((resolve, reject) => {
@@ -263,6 +292,23 @@ export class CliWrapper {
         },
       );
     });
+  }
+
+  /**
+   * Resolve the API key stored via "Set API Key", if any. A SecretStorage
+   * failure must not break the command itself — the CLI's own credential
+   * chain still applies — so errors resolve to undefined.
+   */
+  private async resolveStoredApiKey(): Promise<string | undefined> {
+    if (!this.storedApiKeyProvider) {
+      return undefined;
+    }
+    try {
+      const key = await this.storedApiKeyProvider();
+      return key && key.trim() !== "" ? key : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private async executeJson<T>(args: string[], options?: ExecOptions): Promise<T> {
@@ -380,19 +426,22 @@ export class CliWrapper {
     // this, "Scan failed" would appear exactly when a threat IS detected.
     return this.executeJsonWithContent<ThreatDetectionResult>(["scan", "--json"], text, {
       successExitCodes: [CLI_EXIT_FINDINGS],
+      apiBacked: true,
     });
   }
 
   async redactText(text: string): Promise<RedactResult> {
-    return this.executeJsonWithContent<RedactResult>(["redact", "--json"], text);
+    return this.executeJsonWithContent<RedactResult>(["redact", "--json"], text, {
+      apiBacked: true,
+    });
   }
 
   async listProjects(): Promise<ProjectListResult> {
-    return this.executeJson<ProjectListResult>(["projects", "list", "--json"]);
+    return this.executeJson<ProjectListResult>(["projects", "list", "--json"], { apiBacked: true });
   }
 
   async selectProject(projectId: string): Promise<void> {
-    await this.executeCommand(["projects", "select", projectId]);
+    await this.executeCommand(["projects", "select", projectId], { apiBacked: true });
   }
 
   resetCache(): void {

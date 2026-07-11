@@ -24,7 +24,10 @@ const STATUS_SAVE_DEBOUNCE_MS = 5000;
 
 export function activate(context: vscode.ExtensionContext): void {
   const secrets = new SecretsManager(context);
-  const cli = new CliWrapper();
+  // Give the CLI wrapper access to the key stored via "Set API Key" so
+  // API-backed commands (scan --file, redact, projects) work for users who
+  // only configured the key through the extension, not the CLI itself.
+  const cli = new CliWrapper(() => secrets.getApiKey());
   const outputChannel = vscode.window.createOutputChannel("PromptGuard");
   context.subscriptions.push(outputChannel);
 
