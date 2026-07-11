@@ -8,6 +8,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # @types/vscode must not exceed engines.vscode (^1.80.0), or `vsce package` fails.
+      # Bump this manually in lockstep with engines.vscode when raising the minimum.
+      - dependency-name: "@types/vscode"
     groups:
       all:
         patterns: ["*"]
