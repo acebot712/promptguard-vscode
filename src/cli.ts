@@ -32,7 +32,7 @@ const MUTATING_CLI_TIMEOUT_MS = 300000;
  */
 const MUTATION_TIMEOUT_HINT =
   "The command was killed by a timeout, so the workspace may be partially " +
-  "transformed. Run 'PromptGuard: Disable' (promptguard disable) to restore " +
+  "transformed. Run 'PromptGuard: Disable Protection' (promptguard disable) to restore " +
   "the original files from backups.";
 
 /** Argv flags whose values must never appear in logs or error messages. */

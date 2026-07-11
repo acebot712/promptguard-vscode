@@ -9,7 +9,7 @@ export async function applyCommand(cli: CliWrapper, output: vscode.OutputChannel
   try {
     const confirm = await vscode.window.showWarningMessage(
       "PromptGuard will rewrite your LLM SDK calls to route through its proxy. " +
-        "Your original files are backed up — run 'PromptGuard: Disable' to restore them. Continue?",
+        "Your original files are backed up — run 'PromptGuard: Disable Protection' to restore them. Continue?",
       { modal: true },
       "Apply Protection",
       "Cancel",
