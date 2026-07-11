@@ -51,9 +51,13 @@ export class SecretsManager {
     });
 
     if (apiKey) {
-      await this.storeApiKey(apiKey.trim());
+      // Trim once and use the same value for storage and the return value —
+      // callers (e.g. init) pass the returned key straight to the CLI, so a
+      // stored/returned mismatch would mean two different keys in play.
+      const trimmed = apiKey.trim();
+      await this.storeApiKey(trimmed);
       void vscode.window.showInformationMessage("API key stored securely.");
-      return apiKey;
+      return trimmed;
     }
 
     return undefined;
