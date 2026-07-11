@@ -61,7 +61,7 @@ export class PromptGuardCodeActionProvider implements vscode.CodeActionProvider 
         }
 
         const scanAction = new vscode.CodeAction(
-          "Scan file for security threats",
+          "Scan File for Threats",
           vscode.CodeActionKind.QuickFix,
         );
         scanAction.command = {

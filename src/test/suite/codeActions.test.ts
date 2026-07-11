@@ -105,7 +105,7 @@ suite("Code Actions Test Suite", () => {
     assert.deepStrictEqual(titles, [
       "Apply Protection",
       "Initialize PromptGuard in this project",
-      "Scan file for security threats",
+      "Scan File for Threats",
     ]);
   });
 
