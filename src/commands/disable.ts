@@ -10,11 +10,11 @@ export async function disableCommand(cli: CliWrapper, output: vscode.OutputChann
     const confirm = await vscode.window.showWarningMessage(
       "This will temporarily disable PromptGuard. Continue?",
       { modal: true },
-      "Yes",
-      "No",
+      "Disable",
+      "Cancel",
     );
 
-    if (confirm !== "Yes") {
+    if (confirm !== "Disable") {
       output.appendLine("Cancelled by user");
       return;
     }
