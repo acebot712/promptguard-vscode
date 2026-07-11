@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as child_process from "child_process";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
@@ -13,11 +15,17 @@ const chmod = promisify(fs.chmod);
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/acebot712/promptguard-cli/releases/latest";
 const GITHUB_USER_AGENT = "PromptGuard-VSCode-Extension";
+const MAX_REDIRECTS = 5;
 
-function getAssetName(): string | null {
-  const platform = os.platform();
-  const arch = os.arch();
-
+/**
+ * Map a platform/arch pair to the release asset name published by the CLI's
+ * release pipeline. Exported (with injectable parameters) so tests exercise
+ * the real mapping instead of a re-implementation.
+ */
+export function getAssetName(
+  platform: NodeJS.Platform = os.platform(),
+  arch: string = os.arch(),
+): string | null {
   if (platform === "darwin") {
     if (arch === "arm64") {
       return "promptguard-macos-arm64";
@@ -39,6 +47,21 @@ function getAssetName(): string | null {
   return null;
 }
 
+/**
+ * Extract the expected hex digest for `assetName` from the contents of a
+ * `.sha256` checksum file (`<hex>  <filename>` as produced by sha256sum /
+ * `shasum -a 256`). Returns null if the file does not contain a valid entry.
+ */
+export function parseSha256File(content: string, assetName: string): string | null {
+  for (const line of content.split(/\r?\n/)) {
+    const match = line.trim().match(/^([0-9a-fA-F]{64})[ \t*]+(.+)$/);
+    if (match && path.basename(match[2].trim()) === assetName) {
+      return match[1].toLowerCase();
+    }
+  }
+  return null;
+}
+
 export function getCliInstallDir(context: vscode.ExtensionContext): string {
   return path.join(context.globalStorageUri.fsPath, "bin");
 }
@@ -54,7 +77,7 @@ function httpsGetFollowRedirects(
   headers: Record<string, string> = {},
 ): Promise<http.IncomingMessage> {
   return new Promise((resolve, reject) => {
-    const makeRequest = (requestUrl: string) => {
+    const makeRequest = (requestUrl: string, redirectsLeft: number) => {
       let parsed: URL;
       try {
         parsed = new URL(requestUrl);
@@ -78,11 +101,14 @@ function httpsGetFollowRedirects(
           requestUrl,
           { headers: { "User-Agent": GITHUB_USER_AGENT, ...headers } },
           (response) => {
-            if (
-              (response.statusCode === 301 || response.statusCode === 302) &&
-              response.headers.location
-            ) {
-              makeRequest(response.headers.location);
+            const status = response.statusCode ?? 0;
+            if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
+              response.resume();
+              if (redirectsLeft <= 0) {
+                reject(new Error(`Too many redirects fetching ${url}`));
+                return;
+              }
+              makeRequest(response.headers.location, redirectsLeft - 1);
               return;
             }
             resolve(response);
@@ -90,7 +116,7 @@ function httpsGetFollowRedirects(
         )
         .on("error", reject);
     };
-    makeRequest(url);
+    makeRequest(url, MAX_REDIRECTS);
   });
 }
 
@@ -102,42 +128,102 @@ interface GitHubRelease {
   }[];
 }
 
+async function readBody(response: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    response.setEncoding("utf8");
+    response.on("data", (chunk: string) => (data += chunk));
+    response.on("end", () => resolve(data));
+    response.on("error", reject);
+  });
+}
+
 async function fetchLatestRelease(): Promise<GitHubRelease> {
   const response = await httpsGetFollowRedirects(GITHUB_RELEASES_URL, {
     Accept: "application/vnd.github.v3+json",
   });
 
-  return new Promise((resolve, reject) => {
-    let data = "";
-    response.on("data", (chunk: string) => (data += chunk));
-    response.on("end", () => {
-      try {
-        resolve(JSON.parse(data) as GitHubRelease);
-      } catch {
-        reject(new Error("Failed to parse GitHub release info"));
-      }
-    });
-    response.on("error", reject);
-  });
+  if (response.statusCode !== 200) {
+    response.resume();
+    throw new Error(
+      `GitHub release lookup failed with status ${response.statusCode} ` +
+        "(possibly rate-limited; try again later).",
+    );
+  }
+
+  const data = await readBody(response);
+  try {
+    return JSON.parse(data) as GitHubRelease;
+  } catch {
+    throw new Error("Failed to parse GitHub release info");
+  }
+}
+
+async function downloadText(url: string): Promise<string> {
+  const response = await httpsGetFollowRedirects(url);
+  if (response.statusCode !== 200) {
+    response.resume();
+    throw new Error(`Download failed with status ${response.statusCode} for ${url}`);
+  }
+  return readBody(response);
 }
 
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const response = await httpsGetFollowRedirects(url);
 
   if (response.statusCode !== 200) {
+    response.resume();
     throw new Error(`Download failed with status ${response.statusCode}`);
   }
 
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
-    response.pipe(file);
+    let settled = false;
+    const fail = (err: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      file.close(() => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    };
+    // A response stream error would otherwise leave the promise pending
+    // forever and a truncated file on disk.
+    response.on("error", fail);
+    file.on("error", fail);
     file.on("finish", () => {
-      file.close();
-      resolve();
+      if (settled) {
+        return;
+      }
+      settled = true;
+      file.close(() => resolve());
     });
-    file.on("error", (err) => {
-      fs.unlink(destPath, () => {});
-      reject(err);
+    response.pipe(file);
+  });
+}
+
+async function sha256OfFile(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("error", reject);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+async function validateBinary(binPath: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    child_process.execFile(binPath, ["--version"], { timeout: 15000 }, (error, stdout) => {
+      if (error || !stdout.trim()) {
+        reject(
+          new Error(`Downloaded binary failed --version check: ${error?.message ?? "no output"}`),
+        );
+        return;
+      }
+      resolve();
     });
   });
 }
@@ -167,6 +253,8 @@ export async function installCli(
       cancellable: false,
     },
     async (progress) => {
+      const destPath = getInstalledCliPath(context);
+      const tmpPath = `${destPath}.tmp`;
       try {
         progress.report({ message: "Fetching release info..." });
         output.appendLine("Fetching latest release info from GitHub...");
@@ -179,20 +267,49 @@ export async function installCli(
           throw new Error(`Binary ${assetName} not found in release ${release.tag_name}`);
         }
 
+        const checksumAsset = release.assets.find((a) => a.name === `${assetName}.sha256`);
+        if (!checksumAsset) {
+          throw new Error(
+            `Checksum asset ${assetName}.sha256 not found in release ${release.tag_name}; ` +
+              "refusing to install an unverifiable binary.",
+          );
+        }
+
         progress.report({ message: "Downloading CLI..." });
         output.appendLine(`Downloading ${asset.name}...`);
 
         const binDir = getCliInstallDir(context);
         await mkdir(binDir, { recursive: true });
 
-        const destPath = getInstalledCliPath(context);
-        await downloadFile(asset.browser_download_url, destPath);
+        // Download to a temp path first so a failed/truncated download can
+        // never be mistaken for a valid install.
+        await downloadFile(asset.browser_download_url, tmpPath);
+
+        progress.report({ message: "Verifying checksum..." });
+        const checksumContent = await downloadText(checksumAsset.browser_download_url);
+        const expected = parseSha256File(checksumContent, assetName);
+        if (!expected) {
+          throw new Error(`Could not parse expected checksum from ${assetName}.sha256`);
+        }
+        const actual = await sha256OfFile(tmpPath);
+        if (actual !== expected) {
+          throw new Error(
+            `Checksum mismatch for ${assetName}: expected ${expected}, got ${actual}. ` +
+              "Aborting install.",
+          );
+        }
+        output.appendLine(`Checksum verified (sha256: ${actual})`);
 
         progress.report({ message: "Setting permissions..." });
 
         if (os.platform() !== "win32") {
-          await chmod(destPath, 0o755);
+          await chmod(tmpPath, 0o755);
         }
+
+        progress.report({ message: "Validating binary..." });
+        await validateBinary(tmpPath);
+
+        await fs.promises.rename(tmpPath, destPath);
 
         const config = vscode.workspace.getConfiguration("promptguard");
         await config.update("cliPath", destPath, vscode.ConfigurationTarget.Global);
@@ -205,6 +322,7 @@ export async function installCli(
 
         return destPath;
       } catch (error) {
+        await fs.promises.rm(tmpPath, { force: true }).catch(() => {});
         output.appendLine(`Installation failed: ${errorMessage(error)}`);
         void vscode.window.showErrorMessage(
           `Failed to install PromptGuard CLI: ${errorMessage(error)}`,
