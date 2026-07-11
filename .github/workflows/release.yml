@@ -124,6 +124,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      - name: Verify tag matches package.json version
+        # `vsce publish` publishes whatever version package.json declares --
+        # a tag/manifest mismatch would silently ship the wrong version to
+        # the marketplace under a release tag that claims otherwise.
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG" >&2
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json version."
+
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
