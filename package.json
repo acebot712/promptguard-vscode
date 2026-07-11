@@ -85,12 +85,12 @@
       },
       {
         "command": "promptguard.disable",
-        "title": "Disable",
+        "title": "Disable Protection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.enable",
-        "title": "Enable",
+        "title": "Enable Protection",
         "category": "PromptGuard"
       },
       {
@@ -131,6 +131,20 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "promptguard.scanSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "promptguard.redactSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "promptguard.scanFile",
+          "when": "editorIsOpen"
+        }
+      ],
       "view/title": [
         {
           "command": "promptguard.refreshUI",
