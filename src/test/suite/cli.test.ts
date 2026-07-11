@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { firstLine, redactCliArgs } from "../../cli";
 import { CliExecutionError } from "../../types";
 
 suite("CLI Wrapper Test Suite", () => {
@@ -23,263 +24,52 @@ suite("CLI Wrapper Test Suite", () => {
   });
 
   // ==========================================================================
-  // CLI OUTPUT PARSING TESTS
+  // SENSITIVE ARGV REDACTION (regression: API key leaked into error messages)
   // ==========================================================================
 
-  test("Should parse valid JSON status output", () => {
-    const mockOutput = JSON.stringify({
-      initialized: true,
-      enabled: true,
-      proxy_url: "https://api.promptguard.co/api/v1",
-      providers: ["openai", "anthropic"],
-      configuration: {
-        files_managed: ["app.py", "main.py"],
-        backups: [],
-      },
-    });
-
-    const parsed = JSON.parse(mockOutput) as {
-      initialized: boolean;
-      enabled: boolean;
-      proxy_url: string;
-      providers: string[];
-    };
-
-    assert.strictEqual(parsed.initialized, true);
-    assert.strictEqual(parsed.enabled, true);
-    assert.strictEqual(parsed.proxy_url, "https://api.promptguard.co/api/v1");
-    assert.deepStrictEqual(parsed.providers, ["openai", "anthropic"]);
+  test("redactCliArgs redacts --api-key <value>", () => {
+    const args = ["init", "--api-key", "REDACTED_TEST_FIXTURE", "--auto"];
+    assert.deepStrictEqual(redactCliArgs(args), ["init", "--api-key", "***REDACTED***", "--auto"]);
   });
 
-  test("Should parse valid JSON scan output", () => {
-    const mockOutput = JSON.stringify({
-      total_files_scanned: 100,
-      files_with_sdks: 5,
-      total_instances: 10,
-      providers: [
-        {
-          name: "openai",
-          file_count: 3,
-          instance_count: 7,
-          files: ["app.py", "main.py", "utils.py"],
-        },
-        {
-          name: "anthropic",
-          file_count: 2,
-          instance_count: 3,
-          files: ["claude.py", "chat.py"],
-        },
-      ],
-    });
+  test("redactCliArgs redacts --api-key=<value>", () => {
+    const args = ["init", "--api-key=REDACTED_TEST_FIXTURE"];
+    assert.deepStrictEqual(redactCliArgs(args), ["init", "--api-key=***REDACTED***"]);
+  });
 
-    const parsed = JSON.parse(mockOutput) as {
-      total_files_scanned: number;
-      providers: { name: string; file_count: number }[];
-    };
+  test("redactCliArgs leaves non-sensitive args untouched", () => {
+    const args = ["scan", "--json", "--provider", "openai"];
+    assert.deepStrictEqual(redactCliArgs(args), args);
+  });
 
-    assert.strictEqual(parsed.total_files_scanned, 100);
-    assert.strictEqual(parsed.providers.length, 2);
-    assert.strictEqual(parsed.providers[0].name, "openai");
-    assert.strictEqual(parsed.providers[1].name, "anthropic");
+  test("redactCliArgs never leaks the secret value", () => {
+    const secret = "REDACTED_TEST_FIXTURE";
+    const rendered = redactCliArgs(["init", "--api-key", secret]).join(" ");
+    assert.ok(!rendered.includes(secret));
+  });
+
+  test("redactCliArgs handles trailing --api-key with no value", () => {
+    assert.deepStrictEqual(redactCliArgs(["init", "--api-key"]), ["init", "--api-key"]);
   });
 
   // ==========================================================================
-  // INPUT VALIDATION TESTS
+  // WHICH/WHERE OUTPUT PARSING (regression: Windows `where` prints multiple
+  // lines; keeping interior newlines produced an invalid binary path)
   // ==========================================================================
 
-  test("API key format validation", () => {
-    // Permissive: any key starting with "pg_" is valid; only clearly-wrong input is rejected.
-    const validLiveKey = "pg_live_demo123456789012345678901234";
-    const validFutureKey = "pg_future_scheme123456789012345678";
-    const invalidKey = "sk_live_abc123";
-
-    assert.ok(validLiveKey.startsWith("pg_"), "Should accept live key format");
-    assert.ok(validFutureKey.startsWith("pg_"), "Should accept future pg_ key formats");
-    assert.ok(!invalidKey.startsWith("pg_"), "Should reject non-PromptGuard key formats");
+  test("firstLine takes only the first line of multi-line output", () => {
+    assert.strictEqual(
+      firstLine("C:\\bin\\promptguard.exe\r\nC:\\other\\promptguard.exe\r\n"),
+      "C:\\bin\\promptguard.exe",
+    );
+    assert.strictEqual(firstLine("/usr/local/bin/promptguard\n"), "/usr/local/bin/promptguard");
   });
 
-  test("Proxy URL validation", () => {
-    const validUrls = [
-      "https://api.promptguard.co/api/v1",
-      "https://custom.example.com/proxy",
-      "http://localhost:8080/api",
-      "http://127.0.0.1:3000/v1",
-    ];
-
-    const invalidUrls = ["http://api.promptguard.co/api/v1", "http://evil.com/proxy"];
-
-    for (const url of validUrls) {
-      const isValid =
-        url.startsWith("https://") ||
-        url.startsWith("http://localhost") ||
-        url.startsWith("http://127.0.0.1");
-      assert.ok(isValid, `Valid URL should be accepted: ${url}`);
-    }
-
-    for (const url of invalidUrls) {
-      const isValid =
-        url.startsWith("https://") ||
-        url.startsWith("http://localhost") ||
-        url.startsWith("http://127.0.0.1");
-      assert.ok(!isValid, `Invalid URL should be rejected: ${url}`);
-    }
+  test("firstLine trims whitespace", () => {
+    assert.strictEqual(firstLine("  /usr/local/bin/promptguard  \n"), "/usr/local/bin/promptguard");
   });
 
-  // ==========================================================================
-  // SECURITY SCAN RESULT PARSING TESTS
-  // ==========================================================================
-
-  test("Should parse security scan API response", () => {
-    const mockScanResponse = JSON.stringify({
-      decision: "block",
-      confidence: 0.92,
-      threat_type: "prompt_injection",
-      reason: "Detected attempt to override system instructions",
-    });
-
-    const parsed = JSON.parse(mockScanResponse) as {
-      decision: string;
-      confidence: number;
-      threat_type: string;
-      reason: string;
-    };
-
-    assert.strictEqual(parsed.decision, "block");
-    assert.strictEqual(parsed.confidence, 0.92);
-    assert.strictEqual(parsed.threat_type, "prompt_injection");
-    assert.ok(parsed.reason.length > 0);
-  });
-
-  test("Should parse allow decision", () => {
-    const mockScanResponse = JSON.stringify({
-      decision: "allow",
-      confidence: 0.99,
-    });
-
-    const parsed = JSON.parse(mockScanResponse) as {
-      decision: string;
-      confidence: number;
-    };
-
-    assert.strictEqual(parsed.decision, "allow");
-    assert.ok(parsed.confidence > 0.9);
-  });
-
-  // ==========================================================================
-  // REDACT RESULT PARSING TESTS
-  // ==========================================================================
-
-  test("Should parse redact API response", () => {
-    const mockRedactResponse = JSON.stringify({
-      redacted_text: "Contact [NAME] at [EMAIL] for more information.",
-      entities_found: [
-        { type: "NAME", original: "John Doe", replacement: "[NAME]" },
-        { type: "EMAIL", original: "john.doe@example.com", replacement: "[EMAIL]" },
-      ],
-      entity_count: 2,
-    });
-
-    const parsed = JSON.parse(mockRedactResponse) as {
-      redacted_text: string;
-      entities_found: { type: string; original: string; replacement: string }[];
-      entity_count: number;
-    };
-
-    assert.strictEqual(parsed.entity_count, 2);
-    assert.ok(parsed.redacted_text.includes("[NAME]"));
-    assert.ok(parsed.redacted_text.includes("[EMAIL]"));
-    assert.strictEqual(parsed.entities_found[0].type, "NAME");
-    assert.strictEqual(parsed.entities_found[1].type, "EMAIL");
-  });
-
-  test("Should parse redact response with no entities", () => {
-    const mockRedactResponse = JSON.stringify({
-      redacted_text: "Hello, this is a clean message with no PII.",
-      entities_found: [],
-      entity_count: 0,
-    });
-
-    const parsed = JSON.parse(mockRedactResponse) as {
-      redacted_text: string;
-      entities_found: unknown[];
-      entity_count: number;
-    };
-
-    assert.strictEqual(parsed.entity_count, 0);
-    assert.strictEqual(parsed.entities_found.length, 0);
-  });
-
-  // ==========================================================================
-  // SCAN RESULT WITH INSTANCES TESTS
-  // ==========================================================================
-
-  test("Should parse scan output with instances", () => {
-    const mockOutput = JSON.stringify({
-      total_files_scanned: 50,
-      files_with_sdks: 2,
-      total_instances: 3,
-      providers: [
-        {
-          name: "openai",
-          file_count: 2,
-          instance_count: 3,
-          files: ["app.py", "main.py"],
-          instances: [
-            { file: "app.py", line: 10, column: 5, has_base_url: false },
-            {
-              file: "app.py",
-              line: 25,
-              column: 12,
-              has_base_url: true,
-              current_base_url: "https://api.promptguard.co/api/v1",
-            },
-            { file: "main.py", line: 8, column: 1, has_base_url: false },
-          ],
-        },
-      ],
-    });
-
-    const parsed = JSON.parse(mockOutput) as {
-      providers: {
-        instances: {
-          file: string;
-          line: number;
-          column: number;
-          has_base_url: boolean;
-          current_base_url?: string;
-        }[];
-      }[];
-    };
-
-    const instances = parsed.providers[0].instances;
-    assert.strictEqual(instances.length, 3);
-    assert.strictEqual(instances[0].line, 10);
-    assert.strictEqual(instances[0].column, 5);
-    assert.strictEqual(instances[1].has_base_url, true);
-    assert.ok(instances[1].current_base_url?.includes("promptguard"));
-  });
-
-  // ==========================================================================
-  // COMMAND CONSTRUCTION TESTS
-  // ==========================================================================
-
-  test("Scan text command should be properly constructed", () => {
-    const text = "Hello, my name is John";
-    const args = ["scan", "--json", "--text", text];
-
-    assert.strictEqual(args[0], "scan");
-    assert.strictEqual(args[1], "--json");
-    assert.strictEqual(args[2], "--text");
-    assert.strictEqual(args[3], text);
-  });
-
-  test("Redact text command should be properly constructed", () => {
-    const text = "Contact john@example.com for help";
-    const args = ["redact", "--json", "--text", text];
-
-    assert.strictEqual(args[0], "redact");
-    assert.strictEqual(args[1], "--json");
-    assert.strictEqual(args[2], "--text");
-    assert.strictEqual(args[3], text);
+  test("firstLine of single-line output is the trimmed line", () => {
+    assert.strictEqual(firstLine("/usr/local/bin/promptguard"), "/usr/local/bin/promptguard");
   });
 });
