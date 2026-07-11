@@ -223,9 +223,7 @@ export class CliWrapper {
     const foundPath = await this.findCliBinary();
     if (!foundPath) {
       throw new Error(
-        "PromptGuard CLI not found. Please install it first:\n" +
-          "  curl -fsSL https://raw.githubusercontent.com/acebot712/promptguard-cli/main/install.sh | sh\n\n" +
-          "Or set the 'promptguard.cliPath' setting to the binary location.",
+        "PromptGuard CLI not found. Run 'PromptGuard: Install/Update CLI' or set 'promptguard.cliPath'.",
       );
     }
 

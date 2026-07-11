@@ -56,7 +56,7 @@
       "promptguard": [
         {
           "id": "promptguard.managedFiles",
-          "name": "PromptGuard",
+          "name": "Overview",
           "icon": "$(shield)",
           "contextualTitle": "PromptGuard"
         }
@@ -80,7 +80,7 @@
       },
       {
         "command": "promptguard.apply",
-        "title": "Apply Transformations",
+        "title": "Apply Protection",
         "category": "PromptGuard"
       },
       {
@@ -141,12 +141,12 @@
       "editor/context": [
         {
           "command": "promptguard.scanSelection",
-          "when": "editorHasSelection && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact || editorLangId == python)",
+          "when": "editorHasSelection",
           "group": "promptguard@1"
         },
         {
           "command": "promptguard.redactSelection",
-          "when": "editorHasSelection && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact || editorLangId == python)",
+          "when": "editorHasSelection",
           "group": "promptguard@2"
         }
       ],

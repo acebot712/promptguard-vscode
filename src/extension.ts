@@ -40,12 +40,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const treeDataProvider = registerTreeView(context, cli);
 
-  registerCodeActionProvider(context);
+  // Mirrors the promptguard.initialized context key so the code-action provider
+  // can decide which quick-fix to prefer (see updateContextKeys, which keeps
+  // this in sync with the same cli.status() call that drives the welcome view).
+  const contextState: PromptGuardContextState = { cliAvailable: false, initialized: false };
+  registerCodeActionProvider(context, () => contextState.initialized);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("promptguard.refreshUI", () => {
       void statusBar.updateStatus();
-      void updateContextKeys(cli);
+      void updateContextKeys(cli, contextState);
       treeDataProvider.refresh();
     }),
   );
@@ -128,7 +132,7 @@ export function activate(context: vscode.ExtensionContext): void {
   void (async () => {
     await checkCliInstallation(context, cli, outputChannel);
     void statusBar.updateStatus();
-    void updateContextKeys(cli);
+    void updateContextKeys(cli, contextState);
     void diagnostics.scanAllWorkspaceFolders();
   })();
 
@@ -179,8 +183,14 @@ export async function resolveContextState(cli: CliWrapper): Promise<PromptGuardC
   }
 }
 
-async function updateContextKeys(cli: CliWrapper): Promise<void> {
+async function updateContextKeys(cli: CliWrapper, mirror?: PromptGuardContextState): Promise<void> {
   const state = await resolveContextState(cli);
+  if (mirror) {
+    // Keep the in-memory mirror (read by the code-action provider) consistent
+    // with the context keys that drive the welcome view.
+    mirror.cliAvailable = state.cliAvailable;
+    mirror.initialized = state.initialized;
+  }
   await vscode.commands.executeCommand(
     "setContext",
     "promptguard.cliAvailable",

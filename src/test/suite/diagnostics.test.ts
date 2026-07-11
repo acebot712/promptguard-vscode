@@ -44,6 +44,10 @@ suite("Diagnostics Test Suite", () => {
     assert.strictEqual(diags.length, 1);
     assert.strictEqual(diags[0].source, "PromptGuard");
     assert.strictEqual(diags[0].code, "llm-sdk-unprotected");
+    assert.strictEqual(
+      diags[0].message,
+      "openai SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.",
+    );
     // Unprotected SDK usage is a Warning (yellow), matching the tree's
     // yellow-shield framing and the README's "warnings" wording.
     assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
@@ -118,6 +122,11 @@ suite("Diagnostics Test Suite", () => {
       assert.strictEqual(diags.length, 1, `expected a diagnostic for ${file}`);
       assert.strictEqual(diags[0].code, "llm-sdk-detected");
       assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
+      // File-level warning uses the same unified wording as the instance-level one.
+      assert.strictEqual(
+        diags[0].message,
+        "anthropic SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.",
+      );
     }
 
     diagnostics.dispose();

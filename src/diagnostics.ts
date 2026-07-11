@@ -131,7 +131,7 @@ export class PromptGuardDiagnostics {
           const hasProtection = instance.has_base_url;
           const message = hasProtection
             ? `${provider.name} SDK is already protected by PromptGuard.`
-            : `${provider.name} SDK detected. Run 'PromptGuard: Apply Transformations' to add security.`;
+            : `${provider.name} SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.`;
 
           // Unprotected SDK usage is surfaced as a Warning (yellow), matching
           // the tree's yellow-shield framing and the README's "warnings when
@@ -151,7 +151,7 @@ export class PromptGuardDiagnostics {
         for (const filePath of provider.files) {
           const diagnostic = new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 100),
-            `${provider.name} SDK detected. Consider using PromptGuard for security.`,
+            `${provider.name} SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.`,
             vscode.DiagnosticSeverity.Warning,
           );
           diagnostic.source = "PromptGuard";

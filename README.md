@@ -75,11 +75,11 @@ code --install-extension promptguard.promptguard-vscode
 - Click the status bar indicator (bottom right)
 - Or run `PromptGuard: Show Status` from Command Palette
 
-### Apply Transformations
+### Apply Protection
 
-1. Run `PromptGuard: Apply Transformations` from Command Palette
+1. Run `PromptGuard: Apply Protection` from Command Palette
 2. Confirm the action
-3. Your code will be automatically transformed to use PromptGuard
+3. Your LLM SDK calls are rewritten to route through the PromptGuard proxy (originals are backed up; `PromptGuard: Disable` restores them)
 
 ## Configuration
 
@@ -106,7 +106,7 @@ Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptgua
 - `PromptGuard: Initialize` - Set up PromptGuard in your project
 - `PromptGuard: Detect LLM SDKs` - Detect LLM SDK usage across the project
 - `PromptGuard: Show Status` - Display current configuration
-- `PromptGuard: Apply Transformations` - Apply PromptGuard transformations
+- `PromptGuard: Apply Protection` - Rewrite detected LLM SDK calls to route through PromptGuard
 - `PromptGuard: Disable` - Temporarily disable PromptGuard
 - `PromptGuard: Enable` - Re-enable PromptGuard
 - `PromptGuard: Set API Key` - Store your PromptGuard API key securely

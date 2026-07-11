@@ -7,6 +7,18 @@ export async function enableCommand(cli: CliWrapper, output: vscode.OutputChanne
   output.show(true);
 
   try {
+    const confirm = await vscode.window.showWarningMessage(
+      "This will re-enable PromptGuard and route your LLM SDK calls back through its proxy. Continue?",
+      { modal: true },
+      "Yes",
+      "No",
+    );
+
+    if (confirm !== "Yes") {
+      output.appendLine("Cancelled by user");
+      return;
+    }
+
     output.appendLine("Running: promptguard enable...");
     await vscode.window.withProgress(
       {
