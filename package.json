@@ -65,68 +65,68 @@
     "commands": [
       {
         "command": "promptguard.init",
-        "title": "PromptGuard: Initialize",
+        "title": "Initialize",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scan",
-        "title": "PromptGuard: Scan for LLM SDKs",
+        "title": "Detect LLM SDKs",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.status",
-        "title": "PromptGuard: Show Status",
+        "title": "Show Status",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.apply",
-        "title": "PromptGuard: Apply Transformations",
+        "title": "Apply Transformations",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.disable",
-        "title": "PromptGuard: Disable",
+        "title": "Disable",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.enable",
-        "title": "PromptGuard: Enable",
+        "title": "Enable",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scanSelection",
-        "title": "PromptGuard: Scan Selection for Threats",
+        "title": "Scan Selection for Threats",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.redactSelection",
-        "title": "PromptGuard: Redact PII from Selection",
+        "title": "Redact PII from Selection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scanFile",
-        "title": "PromptGuard: Scan File for Threats",
+        "title": "Scan File for Threats",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.setApiKey",
-        "title": "PromptGuard: Set API Key",
+        "title": "Set API Key",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.selectProject",
-        "title": "PromptGuard: Select Project",
+        "title": "Select Project",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.refreshUI",
-        "title": "PromptGuard: Refresh",
+        "title": "Refresh",
         "category": "PromptGuard",
         "icon": "$(refresh)"
       },
       {
         "command": "promptguard.installCli",
-        "title": "PromptGuard: Install/Update CLI",
+        "title": "Install/Update CLI",
         "category": "PromptGuard"
       }
     ],
@@ -141,12 +141,12 @@
       "editor/context": [
         {
           "command": "promptguard.scanSelection",
-          "when": "editorHasSelection",
+          "when": "editorHasSelection && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact || editorLangId == python)",
           "group": "promptguard@1"
         },
         {
           "command": "promptguard.redactSelection",
-          "when": "editorHasSelection",
+          "when": "editorHasSelection && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == javascript || editorLangId == javascriptreact || editorLangId == python)",
           "group": "promptguard@2"
         }
       ],
@@ -158,6 +158,18 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "promptguard.managedFiles",
+        "when": "!promptguard.cliAvailable",
+        "contents": "The PromptGuard CLI was not found, so status and scanning are unavailable.\n[Install/Update CLI](command:promptguard.installCli)\nAlready installed? Set its location in [Settings](command:workbench.action.openSettings?%5B%22promptguard.cliPath%22%5D)."
+      },
+      {
+        "view": "promptguard.managedFiles",
+        "when": "promptguard.cliAvailable && !promptguard.initialized",
+        "contents": "PromptGuard isn't set up in this project yet. Initialize it to secure your LLM SDK calls, or detect which SDKs are in use first.\n[Initialize PromptGuard](command:promptguard.init)\n[Detect LLM SDKs](command:promptguard.scan)"
+      }
+    ],
     "configuration": {
       "title": "PromptGuard",
       "properties": {

@@ -65,9 +65,9 @@ code --install-extension promptguard.promptguard-vscode
 3. Enter your API key when prompted
 4. Select providers (or press Escape to use all)
 
-### Scan for LLM SDKs
+### Detect LLM SDKs
 
-1. Run `PromptGuard: Scan for LLM SDKs` from Command Palette
+1. Run `PromptGuard: Detect LLM SDKs` from Command Palette
 2. View results in the Output channel
 
 ### Check Status
@@ -104,7 +104,7 @@ Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptgua
 ## Commands
 
 - `PromptGuard: Initialize` - Set up PromptGuard in your project
-- `PromptGuard: Scan for LLM SDKs` - Scan project for LLM SDK usage
+- `PromptGuard: Detect LLM SDKs` - Detect LLM SDK usage across the project
 - `PromptGuard: Show Status` - Display current configuration
 - `PromptGuard: Apply Transformations` - Apply PromptGuard transformations
 - `PromptGuard: Disable` - Temporarily disable PromptGuard
@@ -129,7 +129,7 @@ Click the status bar to view detailed status.
 
 ## Sidebar
 
-Open the shield icon in the Activity Bar for the PromptGuard view. It shows current status, managed files, and an **Actions** group with quick buttons to Initialize / Scan / Enable / Disable, plus **Set API Key** and **Select Project** so you can configure a key or switch projects without opening the Command Palette. Use the refresh icon in the view title bar to update both the tree and the status bar.
+Open the shield icon in the Activity Bar for the PromptGuard view. Before setup it shows a welcome panel that either offers to **Initialize PromptGuard** / **Detect LLM SDKs**, or — if the CLI isn't found — points you at **Install/Update CLI**. Once initialized it shows current status, managed files, and an **Actions** group with quick buttons to Detect / Enable / Disable, plus **Set API Key** and **Select Project** so you can configure a key or switch projects without opening the Command Palette. Use the refresh icon in the view title bar to update both the tree and the status bar.
 
 ## Supported Languages
 

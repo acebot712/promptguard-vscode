@@ -1,5 +1,8 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
+import { CliWrapper } from "../../cli";
+import { resolveContextState } from "../../extension";
+import { StatusResult } from "../../types";
 
 suite("Extension Test Suite", () => {
   vscode.window.showInformationMessage("Start all tests.");
@@ -78,5 +81,37 @@ suite("Extension Test Suite", () => {
     // We just verify the extension activated successfully
     const extension = vscode.extensions.getExtension("promptguard.promptguard-vscode");
     assert.ok(extension?.isActive);
+  });
+
+  // ==========================================================================
+  // WELCOME-VIEW CONTEXT-KEY RESOLUTION (drives contributes.viewsWelcome)
+  // ==========================================================================
+
+  test("resolveContextState: CLI error → unavailable, not initialized", async () => {
+    const cli = {
+      status: () => Promise.reject(new Error("CLI not found")),
+    } as unknown as CliWrapper;
+
+    const state = await resolveContextState(cli);
+    assert.deepStrictEqual(state, { cliAvailable: false, initialized: false });
+  });
+
+  test("resolveContextState: {initialized:false} → available but not initialized", async () => {
+    const cli = {
+      status: () =>
+        Promise.resolve({ initialized: false, status: "not_initialized" } as StatusResult),
+    } as unknown as CliWrapper;
+
+    const state = await resolveContextState(cli);
+    assert.deepStrictEqual(state, { cliAvailable: true, initialized: false });
+  });
+
+  test("resolveContextState: initialized project → available and initialized", async () => {
+    const cli = {
+      status: () => Promise.resolve({ initialized: true, status: "active" } as StatusResult),
+    } as unknown as CliWrapper;
+
+    const state = await resolveContextState(cli);
+    assert.deepStrictEqual(state, { cliAvailable: true, initialized: true });
   });
 });

@@ -45,6 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("promptguard.refreshUI", () => {
       void statusBar.updateStatus();
+      void updateContextKeys(cli);
       treeDataProvider.refresh();
     }),
   );
@@ -127,6 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
   void (async () => {
     await checkCliInstallation(context, cli, outputChannel);
     void statusBar.updateStatus();
+    void updateContextKeys(cli);
     void diagnostics.scanAllWorkspaceFolders();
   })();
 
@@ -143,8 +145,48 @@ async function showFirstRunNotice(context: vscode.ExtensionContext): Promise<voi
   }
   await context.globalState.update(FIRST_RUN_NOTICE_KEY, true);
   void vscode.window.showInformationMessage(
-    "PromptGuard is active — open the shield icon in the Activity Bar to scan your project.",
+    "PromptGuard is ready. Open the shield icon in the Activity Bar to scan your project and get started.",
   );
+}
+
+/**
+ * The two context keys that drive the Activity Bar view's welcome content
+ * (contributes.viewsWelcome in package.json):
+ *
+ *   - promptguard.cliAvailable — false when the CLI cannot answer at all
+ *     (missing binary, spawn/timeout failure, unparseable output). Mirrors the
+ *     status bar's "Unavailable" state.
+ *   - promptguard.initialized  — true only when the CLI reports a genuine
+ *     initialized project ({"initialized": true}).
+ *
+ * Deriving both from a single cli.status() call keeps them consistent with the
+ * status bar and the tree, which use the same throw-vs-{initialized:false}
+ * distinction: a thrown error means "no answer" (CLI unavailable), while a
+ * returned {initialized:false} means "answered: not set up yet".
+ */
+export interface PromptGuardContextState {
+  cliAvailable: boolean;
+  initialized: boolean;
+}
+
+/** Exported for tests: resolve the welcome-view context keys from the CLI. */
+export async function resolveContextState(cli: CliWrapper): Promise<PromptGuardContextState> {
+  try {
+    const status = await cli.status();
+    return { cliAvailable: true, initialized: status.initialized };
+  } catch {
+    return { cliAvailable: false, initialized: false };
+  }
+}
+
+async function updateContextKeys(cli: CliWrapper): Promise<void> {
+  const state = await resolveContextState(cli);
+  await vscode.commands.executeCommand(
+    "setContext",
+    "promptguard.cliAvailable",
+    state.cliAvailable,
+  );
+  await vscode.commands.executeCommand("setContext", "promptguard.initialized", state.initialized);
 }
 
 async function checkCliInstallation(

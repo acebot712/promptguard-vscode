@@ -54,7 +54,7 @@ suite("Tree View Test Suite", () => {
 
   test("createFileItem open command targets the workspace-joined URI", () => {
     const folderUri = vscode.Uri.file("/workspace/project");
-    const item = createFileItem("src/app.py", true, folderUri);
+    const item = createFileItem("src/app.py", folderUri);
 
     assert.strictEqual(item.command?.command, "vscode.open");
     const target = item.command?.arguments?.[0] as vscode.Uri;
@@ -64,13 +64,17 @@ suite("Tree View Test Suite", () => {
     );
   });
 
-  test("createFileItem reflects protection state", () => {
+  test("createFileItem renders managed files as protected", () => {
+    // The CLI's status --json exposes a flat managed_files list with no
+    // per-file protection flag, so every managed file is protected (green
+    // shield). There is no "not yet protected" state here.
     const folderUri = vscode.Uri.file("/workspace/project");
-    const protectedItem = createFileItem("a.py", true, folderUri);
-    const unprotectedItem = createFileItem("b.py", false, folderUri);
+    const item = createFileItem("a.py", folderUri);
 
-    assert.ok(tooltipText(protectedItem).includes("Protected"));
-    assert.ok(tooltipText(unprotectedItem).includes("Not yet protected"));
+    assert.ok(tooltipText(item).includes("Protected"));
+    assert.ok(!tooltipText(item).includes("Not yet protected"));
+    const icon = item.iconPath as vscode.ThemeIcon;
+    assert.strictEqual(icon.id, "shield");
   });
 
   // ==========================================================================
@@ -92,6 +96,21 @@ suite("Tree View Test Suite", () => {
       `expected managed-files category, got: ${labels.join(", ")}`,
     );
     assert.ok(labels.includes("Actions"), `expected Actions category, got: ${labels.join(", ")}`);
+
+    // The SDK-detection action is labeled "Detect LLM SDKs" (the verb "Scan"
+    // is reserved for the threat-detection family).
+    const actionsCategory = topLevel.find((item) => labelText(item) === "Actions");
+    assert.ok(actionsCategory, "Actions category should exist");
+    const actionItems = await provider.getChildren(actionsCategory);
+    const actionLabels = actionItems.map(labelText);
+    assert.ok(
+      actionLabels.includes("Detect LLM SDKs"),
+      `expected a "Detect LLM SDKs" action, got: ${actionLabels.join(", ")}`,
+    );
+    assert.ok(
+      !actionLabels.some((l) => l.includes("Scan")),
+      `no action should use the reserved "Scan" verb, got: ${actionLabels.join(", ")}`,
+    );
   });
 
   test("getChildren managed-file items are clickable with resolved URIs", async () => {
@@ -117,7 +136,11 @@ suite("Tree View Test Suite", () => {
     );
   });
 
-  test("getChildren falls back to init items when the CLI fails", async () => {
+  test("getChildren returns empty when the CLI is unavailable (welcome takes over)", async () => {
+    // A thrown status() means the CLI could not answer (missing/failed). The
+    // tree returns [] so the "CLI unavailable" welcome content shows an
+    // Install/Update CLI action — it must NOT misdiagnose this as
+    // "not initialized" and offer to Initialize.
     const cli = {
       status: () => Promise.reject(new Error("CLI not found")),
     } as unknown as CliWrapper;
@@ -125,9 +148,20 @@ suite("Tree View Test Suite", () => {
     const provider = new PromptGuardTreeDataProvider(cli);
     const topLevel = await provider.getChildren();
 
-    const labels = topLevel.map(labelText);
-    assert.ok(labels.includes("Not Initialized"));
-    assert.ok(labels.includes("Click to Initialize"));
+    assert.deepStrictEqual(topLevel, [], "CLI-unavailable tree must be empty");
+  });
+
+  test("getChildren returns empty when not initialized (welcome takes over)", async () => {
+    // A genuine {"initialized": false} answer: the tree defers to the
+    // "get started" welcome content rather than rendering a Status category.
+    const cli = {
+      status: () => Promise.resolve({ initialized: false, status: "not_initialized" }),
+    } as unknown as CliWrapper;
+
+    const provider = new PromptGuardTreeDataProvider(cli);
+    const topLevel = await provider.getChildren();
+
+    assert.deepStrictEqual(topLevel, [], "not-initialized tree must be empty");
   });
 
   test("refresh clears the cached status", async () => {

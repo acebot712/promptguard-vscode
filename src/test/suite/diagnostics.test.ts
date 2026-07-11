@@ -44,6 +44,9 @@ suite("Diagnostics Test Suite", () => {
     assert.strictEqual(diags.length, 1);
     assert.strictEqual(diags[0].source, "PromptGuard");
     assert.strictEqual(diags[0].code, "llm-sdk-unprotected");
+    // Unprotected SDK usage is a Warning (yellow), matching the tree's
+    // yellow-shield framing and the README's "warnings" wording.
+    assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
     // 1-based CLI line/column mapped to 0-based VS Code positions
     assert.strictEqual(diags[0].range.start.line, 9);
     assert.strictEqual(diags[0].range.start.character, 4);
@@ -114,6 +117,7 @@ suite("Diagnostics Test Suite", () => {
       const diags = diagnostics.getDiagnostics(vscode.Uri.joinPath(folderUri, file));
       assert.strictEqual(diags.length, 1, `expected a diagnostic for ${file}`);
       assert.strictEqual(diags[0].code, "llm-sdk-detected");
+      assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
     }
 
     diagnostics.dispose();

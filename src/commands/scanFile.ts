@@ -9,7 +9,7 @@ export async function scanFileCommand(
 ): Promise<void> {
   const fileUri = uri || vscode.window.activeTextEditor?.document.uri;
   if (!fileUri) {
-    void vscode.window.showWarningMessage("No file to scan");
+    void vscode.window.showWarningMessage("Open a file to scan it for threats.");
     return;
   }
 

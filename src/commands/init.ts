@@ -119,11 +119,19 @@ export async function initCommand(
 
     output.appendLine("Running: promptguard init...");
 
-    await cli.init({
-      apiKey,
-      provider: providers,
-      auto: true,
-    });
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Initializing…",
+        cancellable: false,
+      },
+      () =>
+        cli.init({
+          apiKey,
+          provider: providers,
+          auto: true,
+        }),
+    );
 
     output.appendLine("✓ PromptGuard initialized successfully");
     void vscode.window.showInformationMessage("PromptGuard initialized successfully");

@@ -20,7 +20,14 @@ export async function applyCommand(cli: CliWrapper, output: vscode.OutputChannel
     }
 
     output.appendLine("Running: promptguard apply...");
-    await cli.apply(true);
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Applying transformations…",
+        cancellable: false,
+      },
+      () => cli.apply(true),
+    );
 
     output.appendLine("✓ Transformations applied successfully");
     void vscode.window.showInformationMessage("PromptGuard transformations applied successfully");

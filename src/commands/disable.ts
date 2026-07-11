@@ -20,7 +20,14 @@ export async function disableCommand(cli: CliWrapper, output: vscode.OutputChann
     }
 
     output.appendLine("Running: promptguard disable...");
-    await cli.disable();
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Disabling…",
+        cancellable: false,
+      },
+      () => cli.disable(),
+    );
 
     output.appendLine("✓ PromptGuard disabled");
     void vscode.window.showInformationMessage("PromptGuard disabled");

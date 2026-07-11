@@ -133,9 +133,13 @@ export class PromptGuardDiagnostics {
             ? `${provider.name} SDK is already protected by PromptGuard.`
             : `${provider.name} SDK detected. Run 'PromptGuard: Apply Transformations' to add security.`;
 
+          // Unprotected SDK usage is surfaced as a Warning (yellow), matching
+          // the tree's yellow-shield framing and the README's "warnings when
+          // LLM SDKs are detected without PromptGuard protection". Already
+          // protected usage stays a low-noise Hint.
           const severity = hasProtection
             ? vscode.DiagnosticSeverity.Hint
-            : vscode.DiagnosticSeverity.Information;
+            : vscode.DiagnosticSeverity.Warning;
 
           const diagnostic = new vscode.Diagnostic(range, message, severity);
           diagnostic.source = "PromptGuard";
@@ -148,7 +152,7 @@ export class PromptGuardDiagnostics {
           const diagnostic = new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 100),
             `${provider.name} SDK detected. Consider using PromptGuard for security.`,
-            vscode.DiagnosticSeverity.Information,
+            vscode.DiagnosticSeverity.Warning,
           );
           diagnostic.source = "PromptGuard";
           diagnostic.code = "llm-sdk-detected";

@@ -8,7 +8,14 @@ export async function enableCommand(cli: CliWrapper, output: vscode.OutputChanne
 
   try {
     output.appendLine("Running: promptguard enable...");
-    await cli.enable();
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Enabling…",
+        cancellable: false,
+      },
+      () => cli.enable(),
+    );
 
     output.appendLine("✓ PromptGuard enabled");
     void vscode.window.showInformationMessage("PromptGuard enabled");

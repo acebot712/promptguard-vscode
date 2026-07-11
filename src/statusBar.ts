@@ -40,10 +40,14 @@ export class PromptGuardStatusBar {
       const status = await this.cli.status();
       // A newer update started while this cli.status() was in flight — drop
       // this (older, possibly stale) result rather than repaint over it.
-      if (generation !== this.updateGeneration) return;
+      if (generation !== this.updateGeneration) {
+        return;
+      }
       this.updateStatusBarItem(status);
     } catch (error) {
-      if (generation !== this.updateGeneration) return;
+      if (generation !== this.updateGeneration) {
+        return;
+      }
       // "Not initialized" is reserved for a genuine CLI answer
       // ({"initialized": false}, which `status --json` reports with exit 0).
       // A thrown error here means we could not get an answer at all — CLI

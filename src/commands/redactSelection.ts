@@ -8,7 +8,9 @@ export async function redactSelectionCommand(
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    void vscode.window.showWarningMessage("No active editor");
+    void vscode.window.showWarningMessage(
+      "No active editor — open a file and select text to redact.",
+    );
     return;
   }
 
