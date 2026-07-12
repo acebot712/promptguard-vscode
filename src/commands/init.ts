@@ -89,7 +89,7 @@ export async function initCommand(
     }
 
     const providerOptions = [
-      { label: "All providers", value: "all" },
+      { label: "All providers", value: "all", picked: true },
       { label: "OpenAI", value: "openai" },
       { label: "Anthropic", value: "anthropic" },
       { label: "Cohere", value: "cohere" },
@@ -100,22 +100,38 @@ export async function initCommand(
     ];
 
     const selectedProviders = await vscode.window.showQuickPick(providerOptions, {
-      placeHolder: "Select providers to configure (or press Escape to use all)",
+      placeHolder: "Select providers to configure ('All providers' is pre-selected)",
       canPickMany: true,
     });
 
+    // Escape/dismiss means CANCEL the whole flow, not "configure everything".
+    if (selectedProviders === undefined) {
+      output.appendLine("Initialization cancelled at provider selection.");
+      return;
+    }
+
+    // "All providers" selected (or an empty confirmation) → let the CLI
+    // configure every detected provider by omitting --provider.
     const providers =
-      selectedProviders && selectedProviders.length > 0
+      selectedProviders.length > 0 && !selectedProviders.some((p) => p.value === "all")
         ? selectedProviders.map((p) => p.value)
         : undefined;
 
     output.appendLine("Running: promptguard init...");
 
-    await cli.init({
-      apiKey,
-      provider: providers,
-      auto: true,
-    });
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Initializing…",
+        cancellable: false,
+      },
+      () =>
+        cli.init({
+          apiKey,
+          provider: providers,
+          auto: true,
+        }),
+    );
 
     output.appendLine("✓ PromptGuard initialized successfully");
     void vscode.window.showInformationMessage("PromptGuard initialized successfully");

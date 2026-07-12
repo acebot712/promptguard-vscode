@@ -27,10 +27,24 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Verify tag matches package.json version
+        # Same check as the publish job, but it must ALSO run here: this job
+        # creates the GitHub Release, and a tag/manifest mismatch would
+        # otherwise attach a wrongly-versioned .vsix to the release before
+        # the publish-job check ever runs.
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG" >&2
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json version."
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -44,11 +58,14 @@ jobs:
       - name: Compile TypeScript
         run: npm run compile
 
-      - name: Install vsce
-        run: npm install -g @vscode/vsce
+      - name: Run Tests
+        # ubuntu runner is headless; xvfb provides the display VS Code needs.
+        run: xvfb-run -a npm test
 
       - name: Package extension
-        run: vsce package --no-dependencies
+        # vsce is a pinned devDependency (installed by `npm ci`), not a
+        # floating global install.
+        run: npx vsce package --no-dependencies
         id: package
 
       - name: Extract version from tag
@@ -56,14 +73,14 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: extension
           path: '*.vsix'
           retention-days: 30
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           name: PromptGuard VS Code Extension v${{ steps.get_version.outputs.VERSION }}
           body: |
@@ -119,10 +136,23 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Verify tag matches package.json version
+        # `vsce publish` publishes whatever version package.json declares --
+        # a tag/manifest mismatch would silently ship the wrong version to
+        # the marketplace under a release tag that claims otherwise.
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG" >&2
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json version."
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -133,11 +163,10 @@ jobs:
       - name: Compile TypeScript
         run: npm run compile
 
-      - name: Install vsce
-        run: npm install -g @vscode/vsce
-
       - name: Publish to VS Code Marketplace
-        run: vsce publish --no-dependencies
+        # vsce is a pinned devDependency (installed by `npm ci`), not a
+        # floating global install.
+        run: npx vsce publish --no-dependencies
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 

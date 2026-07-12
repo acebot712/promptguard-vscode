@@ -3,12 +3,19 @@ import { CliWrapper } from "../cli";
 import { errorMessage } from "../utils";
 
 export async function scanCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
-  output.appendLine("PromptGuard: Scanning for LLM SDKs");
+  output.appendLine("PromptGuard: Detecting LLM SDKs");
   output.show(true);
 
   try {
     output.appendLine("Running: promptguard scan...");
-    const result = await cli.scan();
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Detecting LLM SDKs…",
+        cancellable: false,
+      },
+      () => cli.scan(),
+    );
 
     output.appendLine("\n📊 LLM SDK Detection Report");
     output.appendLine("─".repeat(50));

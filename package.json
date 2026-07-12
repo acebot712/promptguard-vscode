@@ -35,6 +35,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "PromptGuard executes a CLI binary and scans workspace files; it is disabled in untrusted workspaces."
+    }
+  },
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -50,7 +56,7 @@
       "promptguard": [
         {
           "id": "promptguard.managedFiles",
-          "name": "PromptGuard",
+          "name": "Overview",
           "icon": "$(shield)",
           "contextualTitle": "PromptGuard"
         }
@@ -59,72 +65,86 @@
     "commands": [
       {
         "command": "promptguard.init",
-        "title": "PromptGuard: Initialize",
+        "title": "Initialize",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scan",
-        "title": "PromptGuard: Scan for LLM SDKs",
+        "title": "Detect LLM SDKs",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.status",
-        "title": "PromptGuard: Show Status",
+        "title": "Show Status",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.apply",
-        "title": "PromptGuard: Apply Transformations",
+        "title": "Apply Protection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.disable",
-        "title": "PromptGuard: Disable",
+        "title": "Disable Protection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.enable",
-        "title": "PromptGuard: Enable",
+        "title": "Enable Protection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scanSelection",
-        "title": "PromptGuard: Scan Selection for Threats",
+        "title": "Scan Selection for Threats",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.redactSelection",
-        "title": "PromptGuard: Redact PII from Selection",
+        "title": "Redact PII from Selection",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.scanFile",
-        "title": "PromptGuard: Scan File for Threats",
+        "title": "Scan File for Threats",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.setApiKey",
-        "title": "PromptGuard: Set API Key",
+        "title": "Set API Key",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.selectProject",
-        "title": "PromptGuard: Select Project",
+        "title": "Select Project",
         "category": "PromptGuard"
       },
       {
         "command": "promptguard.refreshUI",
-        "title": "PromptGuard: Refresh",
+        "title": "Refresh",
         "category": "PromptGuard",
         "icon": "$(refresh)"
       },
       {
         "command": "promptguard.installCli",
-        "title": "PromptGuard: Install/Update CLI",
+        "title": "Install/Update CLI",
         "category": "PromptGuard"
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "promptguard.scanSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "promptguard.redactSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "promptguard.scanFile",
+          "when": "editorIsOpen"
+        }
+      ],
       "view/title": [
         {
           "command": "promptguard.refreshUI",
@@ -147,18 +167,31 @@
       "explorer/context": [
         {
           "command": "promptguard.scanFile",
-          "when": "resourceLangId == typescript || resourceLangId == javascript || resourceLangId == python",
+          "when": "resourceLangId == typescript || resourceLangId == typescriptreact || resourceLangId == javascript || resourceLangId == javascriptreact || resourceLangId == python",
           "group": "promptguard@1"
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "promptguard.managedFiles",
+        "when": "!promptguard.cliAvailable",
+        "contents": "The PromptGuard CLI was not found, so status and scanning are unavailable.\n[Install/Update CLI](command:promptguard.installCli)\nAlready installed? Set its location in [Settings](command:workbench.action.openSettings?%5B%22promptguard.cliPath%22%5D)."
+      },
+      {
+        "view": "promptguard.managedFiles",
+        "when": "promptguard.cliAvailable && !promptguard.initialized",
+        "contents": "PromptGuard isn't set up in this project yet. Initialize it to secure your LLM SDK calls, or detect which SDKs are in use first.\n[Initialize PromptGuard](command:promptguard.init)\n[Detect LLM SDKs](command:promptguard.scan)"
+      }
+    ],
     "configuration": {
       "title": "PromptGuard",
       "properties": {
         "promptguard.cliPath": {
           "type": "string",
+          "scope": "machine",
           "default": "",
-          "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH."
+          "description": "Path to the PromptGuard CLI binary. Leave empty to auto-detect from PATH. Machine-scoped: cannot be overridden by workspace settings (a cloned repo must not be able to point this at an arbitrary executable)."
         },
         "promptguard.scanOnSave": {
           "type": "boolean",
@@ -167,6 +200,7 @@
         },
         "promptguard.autoInstallCli": {
           "type": "string",
+          "scope": "machine",
           "enum": [
             "prompt",
             "never",
@@ -181,29 +215,7 @@
           "description": "Behavior when the PromptGuard CLI is not found on first run: prompt (ask), never (do nothing), or auto (install silently)."
         }
       }
-    },
-    "languages": [
-      {
-        "id": "typescript",
-        "extensions": [
-          ".ts",
-          ".tsx"
-        ]
-      },
-      {
-        "id": "javascript",
-        "extensions": [
-          ".js",
-          ".jsx"
-        ]
-      },
-      {
-        "id": "python",
-        "extensions": [
-          ".py"
-        ]
-      }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -224,6 +236,7 @@
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.63.0",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "3.9.2",
     "eslint": "^9.39.5",
     "glob": "^13.0.6",
     "mocha": "^11.7.6",

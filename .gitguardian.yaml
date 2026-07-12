@@ -1,0 +1,14 @@
+# GitGuardian / ggshield config — https://docs.gitguardian.com/ggshield-docs/reference/config
+#
+# This extension's redaction/validator tests must feed the CLI (and the
+# argv/stderr sanitizers) secret-SHAPED inputs. The rule that keeps this repo
+# free of scanner findings without any per-secret ignores:
+#
+#   ** Never write a contiguous secret-shaped literal (or a `--api-key <value>`
+#      pair) in source. **
+#   Assemble such fixtures from fragments at runtime — the `fakeKey` helper in
+#   src/test/suite/{secrets,cli}.test.ts joins parts, and the sanitizer test
+#   builds `--api-key=<value>` by concatenation — so no source token is long or
+#   adjacent enough for a scanner (or the Generic CLI Option Secret detector)
+#   to flag. Verified with `ggshield secret scan commit-range main..HEAD`.
+version: 2

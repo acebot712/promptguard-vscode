@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { CliWrapper } from "./cli";
 import { StatusResult } from "./types";
 
@@ -13,19 +14,39 @@ class CategoryTreeItem extends vscode.TreeItem {
   }
 }
 
-function createFileItem(filePath: string, isProtected: boolean): vscode.TreeItem {
+/**
+ * Resolve a managed-file path from CLI output to an openable URI. The CLI
+ * reports paths relative to the project root, so relative paths must be
+ * joined against the workspace folder — Uri.file() on a relative path yields
+ * a broken URI and click-to-open fails. Exported for tests.
+ */
+export function resolveManagedFileUri(
+  filePath: string,
+  workspaceFolderUri?: vscode.Uri,
+): vscode.Uri {
+  if (path.isAbsolute(filePath) || !workspaceFolderUri) {
+    return vscode.Uri.file(filePath);
+  }
+  return vscode.Uri.joinPath(workspaceFolderUri, filePath);
+}
+
+/**
+ * Build a tree item for a managed file. Every entry in the CLI's
+ * `status --json` `managed_files` list is, by definition, a file PromptGuard
+ * manages — the CLI exposes no per-file "protected vs pending" flag (it is a
+ * flat path list; see promptguard-cli status.rs `config.metadata.files_managed`).
+ * So a managed file always renders as protected; there is no "not yet
+ * protected" state to distinguish here (unprotected SDK usage surfaces as
+ * editor diagnostics instead). Exported for tests.
+ */
+export function createFileItem(filePath: string, workspaceFolderUri?: vscode.Uri): vscode.TreeItem {
   const item = new vscode.TreeItem(filePath, vscode.TreeItemCollapsibleState.None);
-  item.tooltip = isProtected
-    ? `${filePath} - Protected by PromptGuard`
-    : `${filePath} - Not yet protected`;
-  item.iconPath = new vscode.ThemeIcon(
-    isProtected ? "shield" : "warning",
-    isProtected ? new vscode.ThemeColor("charts.green") : new vscode.ThemeColor("charts.yellow"),
-  );
+  item.tooltip = `${filePath} — Protected by PromptGuard`;
+  item.iconPath = new vscode.ThemeIcon("shield", new vscode.ThemeColor("charts.green"));
   item.command = {
     command: "vscode.open",
     title: "Open File",
-    arguments: [vscode.Uri.file(filePath)],
+    arguments: [resolveManagedFileUri(filePath, workspaceFolderUri)],
   };
   return item;
 }
@@ -75,102 +96,102 @@ export class PromptGuardTreeDataProvider implements vscode.TreeDataProvider<vsco
   private async getTopLevelItems(): Promise<vscode.TreeItem[]> {
     const items: vscode.TreeItem[] = [];
 
+    let status: StatusResult;
     try {
       if (!this.cachedStatus) {
         this.cachedStatus = await this.cli.status();
       }
-      const status = this.cachedStatus;
-
-      const statusIcon =
-        status.status === "active"
-          ? "check"
-          : status.status === "disabled"
-            ? "circle-slash"
-            : "question";
-      const statusLabel =
-        status.status === "active"
-          ? "Active"
-          : status.status === "disabled"
-            ? "Disabled"
-            : "Not Initialized";
-
-      const statusItems: vscode.TreeItem[] = [createInfoItem("Status", statusLabel, statusIcon)];
-
-      if (status.configuration) {
-        statusItems.push(
-          createInfoItem(
-            "Providers",
-            status.configuration.providers.join(", ") || "None",
-            "package",
-          ),
-          createInfoItem("Files Managed", String(status.configuration.files_managed), "file-code"),
-        );
-
-        if (status.configuration.cli_version) {
-          statusItems.push(
-            createInfoItem("CLI Version", status.configuration.cli_version, "versions"),
-          );
-        }
-      }
-
-      items.push(new CategoryTreeItem("Status", statusItems, "info"));
-
-      if (status.configuration?.managed_files && status.configuration.managed_files.length > 0) {
-        const fileItems = status.configuration.managed_files.map((file) =>
-          createFileItem(file, true),
-        );
-        items.push(new CategoryTreeItem(`Managed Files (${fileItems.length})`, fileItems, "files"));
-      }
-
-      const actionItems: vscode.TreeItem[] = [];
-
-      if (status.status === "not_initialized") {
-        const initItem = new vscode.TreeItem("Initialize PromptGuard");
-        initItem.command = { command: "promptguard.init", title: "Initialize" };
-        initItem.iconPath = new vscode.ThemeIcon("rocket");
-        actionItems.push(initItem);
-      } else {
-        const scanItem = new vscode.TreeItem("Scan for LLM SDKs");
-        scanItem.command = { command: "promptguard.scan", title: "Scan" };
-        scanItem.iconPath = new vscode.ThemeIcon("search");
-        actionItems.push(scanItem);
-
-        if (status.status === "active") {
-          const disableItem = new vscode.TreeItem("Disable Protection");
-          disableItem.command = { command: "promptguard.disable", title: "Disable" };
-          disableItem.iconPath = new vscode.ThemeIcon("circle-slash");
-          actionItems.push(disableItem);
-        } else {
-          const enableItem = new vscode.TreeItem("Enable Protection");
-          enableItem.command = { command: "promptguard.enable", title: "Enable" };
-          enableItem.iconPath = new vscode.ThemeIcon("check");
-          actionItems.push(enableItem);
-        }
-      }
-
-      // Always offer key/project management so users don't have to hunt the palette.
-      const setApiKeyItem = new vscode.TreeItem("Set API Key");
-      setApiKeyItem.command = { command: "promptguard.setApiKey", title: "Set API Key" };
-      setApiKeyItem.iconPath = new vscode.ThemeIcon("key");
-      actionItems.push(setApiKeyItem);
-
-      const selectProjectItem = new vscode.TreeItem("Select Project");
-      selectProjectItem.command = { command: "promptguard.selectProject", title: "Select Project" };
-      selectProjectItem.iconPath = new vscode.ThemeIcon("project");
-      actionItems.push(selectProjectItem);
-
-      if (actionItems.length > 0) {
-        items.push(new CategoryTreeItem("Actions", actionItems, "zap"));
-      }
+      status = this.cachedStatus;
     } catch {
-      const notInitItem = new vscode.TreeItem("Not Initialized");
-      notInitItem.iconPath = new vscode.ThemeIcon("warning");
-      items.push(notInitItem);
+      // cli.status() threw: the CLI could not answer at all (missing binary,
+      // spawn/timeout failure, unparseable output) — distinct from a genuine
+      // {"initialized": false}. Returning [] hands the view over to the
+      // "CLI unavailable" welcome content (contributes.viewsWelcome, gated on
+      // !promptguard.cliAvailable), which points at Install/Update CLI rather
+      // than misdiagnosing a missing CLI as "not initialized" and offering to
+      // Initialize. Mirrors the status bar's "Unavailable" handling.
+      return [];
+    }
 
-      const initItem = new vscode.TreeItem("Click to Initialize");
-      initItem.command = { command: "promptguard.init", title: "Initialize" };
-      initItem.iconPath = new vscode.ThemeIcon("rocket");
-      items.push(initItem);
+    // Not set up yet: hand the view over to the "get started" welcome content
+    // (gated on promptguard.cliAvailable && !promptguard.initialized), which
+    // offers Initialize / Detect LLM SDKs.
+    if (!status.initialized || status.status === "not_initialized") {
+      return [];
+    }
+
+    const statusIcon =
+      status.status === "active"
+        ? "check"
+        : status.status === "disabled"
+          ? "circle-slash"
+          : "question";
+    const statusLabel =
+      status.status === "active" ? "Active" : status.status === "disabled" ? "Disabled" : "Unknown";
+
+    const statusItems: vscode.TreeItem[] = [createInfoItem("Status", statusLabel, statusIcon)];
+
+    if (status.configuration) {
+      statusItems.push(
+        createInfoItem("Providers", status.configuration.providers.join(", ") || "None", "package"),
+        createInfoItem("Files Managed", String(status.configuration.files_managed), "file-code"),
+      );
+
+      if (status.configuration.cli_version) {
+        statusItems.push(
+          createInfoItem("CLI Version", status.configuration.cli_version, "versions"),
+        );
+      }
+    }
+
+    items.push(new CategoryTreeItem("Status", statusItems, "info"));
+
+    if (status.configuration?.managed_files && status.configuration.managed_files.length > 0) {
+      // The CLI's `status` runs with cwd = first workspace folder (see
+      // CliWrapper.executeCommand), so relative managed-file paths resolve
+      // against that folder.
+      const workspaceFolderUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const fileItems = status.configuration.managed_files.map((file) =>
+        createFileItem(file, workspaceFolderUri),
+      );
+      items.push(new CategoryTreeItem(`Managed Files (${fileItems.length})`, fileItems, "files"));
+    }
+
+    // Only initialized projects reach here (not_initialized / CLI-unavailable
+    // return [] above), so the actions are always the post-init set.
+    const actionItems: vscode.TreeItem[] = [];
+
+    const detectItem = new vscode.TreeItem("Detect LLM SDKs");
+    detectItem.command = { command: "promptguard.scan", title: "Detect LLM SDKs" };
+    detectItem.tooltip = "Detect LLM SDK usage across this project";
+    detectItem.iconPath = new vscode.ThemeIcon("search");
+    actionItems.push(detectItem);
+
+    if (status.status === "active") {
+      const disableItem = new vscode.TreeItem("Disable Protection");
+      disableItem.command = { command: "promptguard.disable", title: "Disable" };
+      disableItem.iconPath = new vscode.ThemeIcon("circle-slash");
+      actionItems.push(disableItem);
+    } else {
+      const enableItem = new vscode.TreeItem("Enable Protection");
+      enableItem.command = { command: "promptguard.enable", title: "Enable" };
+      enableItem.iconPath = new vscode.ThemeIcon("check");
+      actionItems.push(enableItem);
+    }
+
+    // Always offer key/project management so users don't have to hunt the palette.
+    const setApiKeyItem = new vscode.TreeItem("Set API Key");
+    setApiKeyItem.command = { command: "promptguard.setApiKey", title: "Set API Key" };
+    setApiKeyItem.iconPath = new vscode.ThemeIcon("key");
+    actionItems.push(setApiKeyItem);
+
+    const selectProjectItem = new vscode.TreeItem("Select Project");
+    selectProjectItem.command = { command: "promptguard.selectProject", title: "Select Project" };
+    selectProjectItem.iconPath = new vscode.ThemeIcon("project");
+    actionItems.push(selectProjectItem);
+
+    if (actionItems.length > 0) {
+      items.push(new CategoryTreeItem("Actions", actionItems, "zap"));
     }
 
     return items;

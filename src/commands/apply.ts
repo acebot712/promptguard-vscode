@@ -3,24 +3,32 @@ import { CliWrapper } from "../cli";
 import { errorMessage } from "../utils";
 
 export async function applyCommand(cli: CliWrapper, output: vscode.OutputChannel): Promise<void> {
-  output.appendLine("PromptGuard: Apply Transformations");
+  output.appendLine("PromptGuard: Apply Protection");
   output.show(true);
 
   try {
     const confirm = await vscode.window.showWarningMessage(
-      "This will apply PromptGuard transformations to your code. Continue?",
+      "PromptGuard will rewrite your LLM SDK calls to route through its proxy. " +
+        "Your original files are backed up — run 'PromptGuard: Disable Protection' to restore them. Continue?",
       { modal: true },
-      "Yes",
-      "No",
+      "Apply Protection",
+      "Cancel",
     );
 
-    if (confirm !== "Yes") {
+    if (confirm !== "Apply Protection") {
       output.appendLine("Cancelled by user");
       return;
     }
 
     output.appendLine("Running: promptguard apply...");
-    await cli.apply(true);
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "PromptGuard: Applying transformations…",
+        cancellable: false,
+      },
+      () => cli.apply(true),
+    );
 
     output.appendLine("✓ Transformations applied successfully");
     void vscode.window.showInformationMessage("PromptGuard transformations applied successfully");

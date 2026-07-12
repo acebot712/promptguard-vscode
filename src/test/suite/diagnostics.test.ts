@@ -1,200 +1,204 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
+import { CliWrapper } from "../../cli";
+import { PromptGuardDiagnostics } from "../../diagnostics";
+import { ScanResult } from "../../types";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function scanResultWithFile(file: string): ScanResult {
+  return {
+    total_files_scanned: 1,
+    files_with_sdks: 1,
+    total_instances: 1,
+    providers: [
+      {
+        name: "openai",
+        file_count: 1,
+        instance_count: 1,
+        files: [file],
+        instances: [{ file, line: 10, column: 5, has_base_url: false }],
+      },
+    ],
+  };
+}
 
 suite("Diagnostics Test Suite", () => {
-  // ==========================================================================
-  // DIAGNOSTIC COLLECTION TESTS
-  // ==========================================================================
+  test("applyScanResult joins relative paths against the workspace folder", () => {
+    const cli = {} as CliWrapper;
+    const diagnostics = new PromptGuardDiagnostics(cli);
+    const folderUri = vscode.Uri.file("/test/workspace");
 
-  test("Diagnostic collection should be creatable", () => {
-    const collection = vscode.languages.createDiagnosticCollection("promptguard-test");
-    assert.ok(collection);
-    assert.strictEqual(collection.name, "promptguard-test");
-    collection.dispose();
-  });
+    diagnostics.applyScanResult(scanResultWithFile("src/app.py"), folderUri);
 
-  test("Diagnostics can be added to collection", () => {
-    const collection = vscode.languages.createDiagnosticCollection("promptguard-test");
-
-    const uri = vscode.Uri.file("/test/file.py");
-    const range = new vscode.Range(0, 0, 0, 10);
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      "Test diagnostic message",
-      vscode.DiagnosticSeverity.Warning,
+    const expectedUri = vscode.Uri.joinPath(folderUri, "src/app.py");
+    const diags = diagnostics.getDiagnostics(expectedUri);
+    assert.strictEqual(diags.length, 1);
+    assert.strictEqual(diags[0].source, "PromptGuard");
+    assert.strictEqual(diags[0].code, "llm-sdk-unprotected");
+    assert.strictEqual(
+      diags[0].message,
+      "openai SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.",
     );
+    // Unprotected SDK usage is a Warning (yellow), matching the tree's
+    // yellow-shield framing and the README's "warnings" wording.
+    assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
+    // 1-based CLI line/column mapped to 0-based VS Code positions
+    assert.strictEqual(diags[0].range.start.line, 9);
+    assert.strictEqual(diags[0].range.start.character, 4);
 
-    collection.set(uri, [diagnostic]);
-
-    const diagnostics = collection.get(uri);
-    assert.ok(diagnostics);
-    assert.strictEqual(diagnostics.length, 1);
-    assert.strictEqual(diagnostics[0].message, "Test diagnostic message");
-
-    collection.dispose();
+    diagnostics.dispose();
   });
 
-  // ==========================================================================
-  // SEVERITY TESTS
-  // ==========================================================================
+  test("applyScanResult marks protected instances as hints", () => {
+    const cli = {} as CliWrapper;
+    const diagnostics = new PromptGuardDiagnostics(cli);
+    const folderUri = vscode.Uri.file("/test/workspace");
 
-  test("Diagnostic severities should be available", () => {
-    assert.ok(vscode.DiagnosticSeverity.Error !== undefined);
-    assert.ok(vscode.DiagnosticSeverity.Warning !== undefined);
-    assert.ok(vscode.DiagnosticSeverity.Information !== undefined);
-    assert.ok(vscode.DiagnosticSeverity.Hint !== undefined);
-  });
-
-  // ==========================================================================
-  // RANGE TESTS
-  // ==========================================================================
-
-  test("Range should be creatable with line and character", () => {
-    const range = new vscode.Range(new vscode.Position(5, 0), new vscode.Position(5, 20));
-
-    assert.strictEqual(range.start.line, 5);
-    assert.strictEqual(range.start.character, 0);
-    assert.strictEqual(range.end.line, 5);
-    assert.strictEqual(range.end.character, 20);
-  });
-
-  // ==========================================================================
-  // DIAGNOSTIC CODE TESTS
-  // ==========================================================================
-
-  test("Diagnostic code can be set to string", () => {
-    const range = new vscode.Range(0, 0, 0, 10);
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      "Test message",
-      vscode.DiagnosticSeverity.Warning,
-    );
-
-    diagnostic.code = "llm-sdk-unprotected";
-    assert.strictEqual(diagnostic.code, "llm-sdk-unprotected");
-  });
-
-  test("Diagnostic source can be set", () => {
-    const range = new vscode.Range(0, 0, 0, 10);
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      "Test message",
-      vscode.DiagnosticSeverity.Warning,
-    );
-
-    diagnostic.source = "PromptGuard";
-    assert.strictEqual(diagnostic.source, "PromptGuard");
-  });
-
-  // ==========================================================================
-  // SDK INSTANCE DIAGNOSTICS TESTS
-  // ==========================================================================
-
-  test("Diagnostic can be created from SdkInstance data", () => {
-    // Simulate data from CLI
-    const instance = {
-      file: "app.py",
-      line: 15,
-      column: 8,
-      has_base_url: false,
+    const result: ScanResult = {
+      total_files_scanned: 1,
+      files_with_sdks: 1,
+      total_instances: 1,
+      providers: [
+        {
+          name: "openai",
+          file_count: 1,
+          instance_count: 1,
+          files: ["app.py"],
+          instances: [
+            {
+              file: "app.py",
+              line: 3,
+              column: 1,
+              has_base_url: true,
+              current_base_url: "https://api.promptguard.co/api/v1",
+            },
+          ],
+        },
+      ],
     };
 
-    // Create diagnostic with line/column info (0-indexed for VS Code)
-    const startPos = new vscode.Position(instance.line - 1, instance.column - 1);
-    const endPos = new vscode.Position(instance.line - 1, instance.column + 20);
-    const range = new vscode.Range(startPos, endPos);
+    diagnostics.applyScanResult(result, folderUri);
 
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      "Unprotected LLM SDK detected",
-      vscode.DiagnosticSeverity.Warning,
-    );
-    diagnostic.code = "llm-sdk-unprotected";
-    diagnostic.source = "PromptGuard";
+    const diags = diagnostics.getDiagnostics(vscode.Uri.joinPath(folderUri, "app.py"));
+    assert.strictEqual(diags.length, 1);
+    assert.strictEqual(diags[0].code, "llm-sdk-protected");
+    assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Hint);
 
-    assert.strictEqual(diagnostic.range.start.line, 14);
-    assert.strictEqual(diagnostic.range.start.character, 7);
-    assert.strictEqual(diagnostic.code, "llm-sdk-unprotected");
+    diagnostics.dispose();
   });
 
-  test("Protected SDK diagnostic uses Information severity", () => {
-    const instance = {
-      file: "app.py",
-      line: 20,
-      column: 4,
-      has_base_url: true,
-      current_base_url: "https://api.promptguard.co/api/v1",
+  test("applyScanResult falls back to file-level diagnostics without instances", () => {
+    const cli = {} as CliWrapper;
+    const diagnostics = new PromptGuardDiagnostics(cli);
+    const folderUri = vscode.Uri.file("/test/workspace");
+
+    const result: ScanResult = {
+      total_files_scanned: 2,
+      files_with_sdks: 2,
+      total_instances: 0,
+      providers: [
+        {
+          name: "anthropic",
+          file_count: 2,
+          instance_count: 0,
+          files: ["a.py", "lib/b.py"],
+        },
+      ],
     };
 
-    const range = new vscode.Range(
-      new vscode.Position(instance.line - 1, instance.column - 1),
-      new vscode.Position(instance.line - 1, instance.column + 30),
-    );
+    diagnostics.applyScanResult(result, folderUri);
 
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      "Protected by PromptGuard",
-      vscode.DiagnosticSeverity.Information,
-    );
-    diagnostic.code = "llm-sdk-protected";
+    for (const file of ["a.py", "lib/b.py"]) {
+      const diags = diagnostics.getDiagnostics(vscode.Uri.joinPath(folderUri, file));
+      assert.strictEqual(diags.length, 1, `expected a diagnostic for ${file}`);
+      assert.strictEqual(diags[0].code, "llm-sdk-detected");
+      assert.strictEqual(diags[0].severity, vscode.DiagnosticSeverity.Warning);
+      // File-level warning uses the same unified wording as the instance-level one.
+      assert.strictEqual(
+        diags[0].message,
+        "anthropic SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.",
+      );
+    }
 
-    assert.strictEqual(diagnostic.severity, vscode.DiagnosticSeverity.Information);
-    assert.strictEqual(diagnostic.code, "llm-sdk-protected");
+    diagnostics.dispose();
   });
 
-  // ==========================================================================
-  // MULTIPLE DIAGNOSTICS TESTS
-  // ==========================================================================
+  test("A stale (older) scan cannot overwrite a newer scan's results", async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder, "test harness must open a workspace folder");
 
-  test("Multiple diagnostics can be set for a file", () => {
-    const collection = vscode.languages.createDiagnosticCollection("promptguard-test");
-    const uri = vscode.Uri.file("/test/multifile.py");
+    const first = deferred<ScanResult>();
+    const second = deferred<ScanResult>();
+    let calls = 0;
+    const cli = {
+      scan: () => {
+        calls++;
+        return calls === 1 ? first.promise : second.promise;
+      },
+    } as unknown as CliWrapper;
 
-    const diagnostics = [
-      new vscode.Diagnostic(
-        new vscode.Range(5, 0, 5, 20),
-        "First SDK instance",
-        vscode.DiagnosticSeverity.Warning,
-      ),
-      new vscode.Diagnostic(
-        new vscode.Range(15, 0, 15, 25),
-        "Second SDK instance",
-        vscode.DiagnosticSeverity.Warning,
-      ),
-      new vscode.Diagnostic(
-        new vscode.Range(30, 4, 30, 40),
-        "Third SDK instance",
-        vscode.DiagnosticSeverity.Information,
-      ),
-    ];
+    const diagnostics = new PromptGuardDiagnostics(cli);
 
-    collection.set(uri, diagnostics);
+    const olderScan = diagnostics.scanAllWorkspaceFolders();
+    const newerScan = diagnostics.scanAllWorkspaceFolders();
 
-    const retrieved = collection.get(uri);
-    assert.strictEqual(retrieved?.length, 3);
+    // The newer scan finishes first...
+    second.resolve(scanResultWithFile("newer.py"));
+    await newerScan;
 
-    collection.dispose();
+    // ...then the older, slower scan finally resolves with stale data.
+    first.resolve(scanResultWithFile("older.py"));
+    await olderScan;
+
+    const newerUri = vscode.Uri.joinPath(folder.uri, "newer.py");
+    const olderUri = vscode.Uri.joinPath(folder.uri, "older.py");
+    assert.strictEqual(diagnostics.getDiagnostics(newerUri).length, 1);
+    assert.strictEqual(
+      diagnostics.getDiagnostics(olderUri).length,
+      0,
+      "stale scan results must be discarded",
+    );
+
+    diagnostics.dispose();
   });
 
-  test("Diagnostics can be cleared", () => {
-    const collection = vscode.languages.createDiagnosticCollection("promptguard-test");
-    const uri = vscode.Uri.file("/test/clearable.py");
+  test("A failed scan keeps the last-good diagnostics", async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder, "test harness must open a workspace folder");
 
-    collection.set(uri, [
-      new vscode.Diagnostic(
-        new vscode.Range(0, 0, 0, 10),
-        "Temporary",
-        vscode.DiagnosticSeverity.Warning,
-      ),
-    ]);
+    let calls = 0;
+    const cli = {
+      scan: () => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve(scanResultWithFile("kept.py"));
+        }
+        return Promise.reject(new Error("transient CLI failure"));
+      },
+    } as unknown as CliWrapper;
 
-    assert.strictEqual(collection.get(uri)?.length, 1);
+    const diagnostics = new PromptGuardDiagnostics(cli);
 
-    collection.clear();
+    await diagnostics.scanAllWorkspaceFolders();
+    const uri = vscode.Uri.joinPath(folder.uri, "kept.py");
+    assert.strictEqual(diagnostics.getDiagnostics(uri).length, 1);
 
-    // After clear, get returns undefined
-    assert.ok(!collection.get(uri) || collection.get(uri)?.length === 0);
+    await diagnostics.scanAllWorkspaceFolders();
+    assert.strictEqual(
+      diagnostics.getDiagnostics(uri).length,
+      1,
+      "a transient scan error must not clear existing diagnostics",
+    );
 
-    collection.dispose();
+    diagnostics.dispose();
   });
 });

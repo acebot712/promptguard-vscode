@@ -65,9 +65,9 @@ code --install-extension promptguard.promptguard-vscode
 3. Enter your API key when prompted
 4. Select providers (or press Escape to use all)
 
-### Scan for LLM SDKs
+### Detect LLM SDKs
 
-1. Run `PromptGuard: Scan for LLM SDKs` from Command Palette
+1. Run `PromptGuard: Detect LLM SDKs` from Command Palette
 2. View results in the Output channel
 
 ### Check Status
@@ -75,11 +75,11 @@ code --install-extension promptguard.promptguard-vscode
 - Click the status bar indicator (bottom right)
 - Or run `PromptGuard: Show Status` from Command Palette
 
-### Apply Transformations
+### Apply Protection
 
-1. Run `PromptGuard: Apply Transformations` from Command Palette
+1. Run `PromptGuard: Apply Protection` from Command Palette
 2. Confirm the action
-3. Your code will be automatically transformed to use PromptGuard
+3. Your LLM SDK calls are rewritten to route through the PromptGuard proxy (originals are backed up; `PromptGuard: Disable Protection` restores them)
 
 ## Configuration
 
@@ -104,11 +104,11 @@ Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptgua
 ## Commands
 
 - `PromptGuard: Initialize` - Set up PromptGuard in your project
-- `PromptGuard: Scan for LLM SDKs` - Scan project for LLM SDK usage
+- `PromptGuard: Detect LLM SDKs` - Detect LLM SDK usage across the project
 - `PromptGuard: Show Status` - Display current configuration
-- `PromptGuard: Apply Transformations` - Apply PromptGuard transformations
-- `PromptGuard: Disable` - Temporarily disable PromptGuard
-- `PromptGuard: Enable` - Re-enable PromptGuard
+- `PromptGuard: Apply Protection` - Rewrite detected LLM SDK calls to route through PromptGuard
+- `PromptGuard: Disable Protection` - Temporarily disable PromptGuard
+- `PromptGuard: Enable Protection` - Re-enable PromptGuard
 - `PromptGuard: Set API Key` - Store your PromptGuard API key securely
 - `PromptGuard: Select Project` - Switch the active PromptGuard project
 - `PromptGuard: Scan Selection for Threats` - Scan the selected text for prompt injection and PII
@@ -129,7 +129,7 @@ Click the status bar to view detailed status.
 
 ## Sidebar
 
-Open the shield icon in the Activity Bar for the PromptGuard view. It shows current status, managed files, and an **Actions** group with quick buttons to Initialize / Scan / Enable / Disable, plus **Set API Key** and **Select Project** so you can configure a key or switch projects without opening the Command Palette. Use the refresh icon in the view title bar to update both the tree and the status bar.
+Open the shield icon in the Activity Bar for the PromptGuard view. Before setup it shows a welcome panel that either offers to **Initialize PromptGuard** / **Detect LLM SDKs**, or — if the CLI isn't found — points you at **Install/Update CLI**. Once initialized it shows current status, managed files, and an **Actions** group with quick buttons to Detect / Enable Protection / Disable Protection, plus **Set API Key** and **Select Project** so you can configure a key or switch projects without opening the Command Palette. Use the refresh icon in the view title bar to update both the tree and the status bar.
 
 ## Supported Languages
 

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CliWrapper } from "./cli";
+import { resolveManagedFileUri } from "./treeView";
 import { ScanResult } from "./types";
 import { SUPPORTED_LANGUAGES } from "./utils";
 
@@ -10,6 +11,12 @@ export class PromptGuardDiagnostics {
   private cli: CliWrapper;
   private disposables: vscode.Disposable[] = [];
   private debounceTimer: NodeJS.Timeout | undefined;
+  /**
+   * Monotonic scan generation. Each scan captures the counter at start and
+   * discards its results if another scan started afterwards, so a slow older
+   * scan can never overwrite the results of a newer one.
+   */
+  private scanGeneration = 0;
 
   constructor(cli: CliWrapper) {
     this.cli = cli;
@@ -27,13 +34,13 @@ export class PromptGuardDiagnostics {
     }
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
-      void this.scanWorkspace();
+      void this.scanAllWorkspaceFolders();
     }, SCAN_DEBOUNCE_MS);
   }
 
   activate(context: vscode.ExtensionContext): void {
-    void this.scanWorkspace();
-
+    // NOTE: no initial scan here — extension.ts triggers the first scan after
+    // CLI resolution/installation completes, so the two never race.
     const fileWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
       if (!this.isScanOnSaveEnabled()) {
         return;
@@ -46,44 +53,77 @@ export class PromptGuardDiagnostics {
     });
 
     const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      void this.scanWorkspace();
+      void this.scanAllWorkspaceFolders();
     });
 
     this.disposables.push(fileWatcher, workspaceWatcher);
     context.subscriptions.push(...this.disposables);
   }
 
-  private async scanWorkspace(): Promise<void> {
-    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+  /**
+   * Scan every workspace folder and replace diagnostics with the combined
+   * results. On any scan error the previous (last-good) diagnostics are kept
+   * rather than wiped, so a transient CLI failure doesn't blank the Problems
+   * panel.
+   */
+  async scanAllWorkspaceFolders(): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
       return;
     }
 
-    try {
-      const result = await this.cli.scan();
-      this.updateDiagnostics(result);
-    } catch {
-      this.diagnosticCollection.clear();
+    const generation = ++this.scanGeneration;
+    const results: { folder: vscode.WorkspaceFolder; result: ScanResult }[] = [];
+
+    for (const folder of folders) {
+      try {
+        const result = await this.cli.scan(folder.uri.fsPath);
+        results.push({ folder, result });
+      } catch {
+        // Transient error (CLI missing, timeout, ...): keep last-good diagnostics.
+        return;
+      }
+    }
+
+    if (generation !== this.scanGeneration) {
+      // A newer scan started while we were running; discard these stale results.
+      return;
+    }
+
+    this.diagnosticCollection.clear();
+    for (const { folder, result } of results) {
+      this.applyScanResult(result, folder.uri);
     }
   }
 
-  private updateDiagnostics(scanResult: ScanResult): void {
-    this.diagnosticCollection.clear();
-
+  /**
+   * Translate one folder's scan result into diagnostics (additive: does not
+   * clear other folders' entries). Public so unit tests can exercise the
+   * mapping against a stubbed scan result.
+   */
+  applyScanResult(scanResult: ScanResult, folderUri: vscode.Uri): void {
     if (scanResult.providers.length === 0) {
-      return;
-    }
-
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
       return;
     }
 
     const diagnostics: Map<string, vscode.Diagnostic[]> = new Map();
 
+    const addDiagnostic = (filePath: string, diagnostic: vscode.Diagnostic) => {
+      // Reuse the tree view's resolver: CLI paths are usually relative to the
+      // scanned folder, but absolute paths must not be joinPath'd onto it.
+      const uri = resolveManagedFileUri(filePath, folderUri);
+      const uriString = uri.toString();
+      const existing = diagnostics.get(uriString);
+      if (existing) {
+        existing.push(diagnostic);
+      } else {
+        diagnostics.set(uriString, [diagnostic]);
+      }
+    };
+
     for (const provider of scanResult.providers) {
       if (provider.instances && provider.instances.length > 0) {
         for (const instance of provider.instances) {
-          const uri = vscode.Uri.joinPath(workspaceFolder.uri, instance.file);
           const line = Math.max(0, instance.line - 1);
           const column = Math.max(0, instance.column - 1);
           const range = new vscode.Range(line, column, line, column + 50);
@@ -91,43 +131,33 @@ export class PromptGuardDiagnostics {
           const hasProtection = instance.has_base_url;
           const message = hasProtection
             ? `${provider.name} SDK is already protected by PromptGuard.`
-            : `${provider.name} SDK detected. Run 'PromptGuard: Apply Transformations' to add security.`;
+            : `${provider.name} SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.`;
 
+          // Unprotected SDK usage is surfaced as a Warning (yellow), matching
+          // the tree's yellow-shield framing and the README's "warnings when
+          // LLM SDKs are detected without PromptGuard protection". Already
+          // protected usage stays a low-noise Hint.
           const severity = hasProtection
             ? vscode.DiagnosticSeverity.Hint
-            : vscode.DiagnosticSeverity.Information;
+            : vscode.DiagnosticSeverity.Warning;
 
           const diagnostic = new vscode.Diagnostic(range, message, severity);
           diagnostic.source = "PromptGuard";
           diagnostic.code = hasProtection ? "llm-sdk-protected" : "llm-sdk-unprotected";
 
-          const uriString = uri.toString();
-          const existing = diagnostics.get(uriString);
-          if (existing) {
-            existing.push(diagnostic);
-          } else {
-            diagnostics.set(uriString, [diagnostic]);
-          }
+          addDiagnostic(instance.file, diagnostic);
         }
       } else {
         for (const filePath of provider.files) {
-          const uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
-
           const diagnostic = new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 100),
-            `${provider.name} SDK detected. Consider using PromptGuard for security.`,
-            vscode.DiagnosticSeverity.Information,
+            `${provider.name} SDK detected. Run 'PromptGuard: Apply Protection' to secure this call.`,
+            vscode.DiagnosticSeverity.Warning,
           );
           diagnostic.source = "PromptGuard";
           diagnostic.code = "llm-sdk-detected";
 
-          const uriString = uri.toString();
-          const existing = diagnostics.get(uriString);
-          if (existing) {
-            existing.push(diagnostic);
-          } else {
-            diagnostics.set(uriString, [diagnostic]);
-          }
+          addDiagnostic(filePath, diagnostic);
         }
       }
     }
@@ -135,6 +165,11 @@ export class PromptGuardDiagnostics {
     for (const [uriString, diags] of diagnostics.entries()) {
       this.diagnosticCollection.set(vscode.Uri.parse(uriString), diags);
     }
+  }
+
+  /** Read back the diagnostics currently set for a URI (used by tests). */
+  getDiagnostics(uri: vscode.Uri): readonly vscode.Diagnostic[] {
+    return this.diagnosticCollection.get(uri) ?? [];
   }
 
   dispose(): void {
