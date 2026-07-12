@@ -1,27 +1,14 @@
 # GitGuardian / ggshield config — https://docs.gitguardian.com/ggshield-docs/reference/config
 #
 # This extension's redaction/validator tests must feed the CLI (and the
-# argv/stderr sanitizers) secret-SHAPED inputs. The standing rule that keeps
-# this file from ever growing — and keeps ggshield and the SaaS App in
-# agreement:
+# argv/stderr sanitizers) secret-SHAPED inputs. The rule that keeps this repo
+# free of scanner findings without any per-secret ignores:
 #
-#   ** Never write a contiguous secret-shaped literal in source. **
-#   Assemble such fixtures from sub-threshold fragments at runtime
-#   (see src/test/suite/{secrets,cli,cliContract}.test.ts — the `fakeKey`
-#   helper joins parts, so no fragment in source is long/entropic enough for
-#   any scanner to flag). New tests then add zero findings and zero entries
-#   here.
-#
-# The entries below ignore, by secret SHA (path-/commit-independent), two
-# false positives from the "Generic CLI Option Secret" detector: the words
-# after `--api-key` in a test's description string and in a sanitizer test
-# input (`--api-key=" + "oddformat`). Neither is a real credential — they exist to
-# prove the argv/stderr redaction actually redacts `--api-key` values.
+#   ** Never write a contiguous secret-shaped literal (or a `--api-key <value>`
+#      pair) in source. **
+#   Assemble such fixtures from fragments at runtime — the `fakeKey` helper in
+#   src/test/suite/{secrets,cli}.test.ts joins parts, and the sanitizer test
+#   builds `--api-key=<value>` by concatenation — so no source token is long or
+#   adjacent enough for a scanner (or the Generic CLI Option Secret detector)
+#   to flag. Verified with `ggshield secret scan commit-range main..HEAD`.
 version: 2
-
-secret:
-  ignored_matches:
-    - name: "Generic CLI Option false positive: --api-key in a test description"
-      match: 45f2c16c3566b03895ab88a918d2c81d991b8cc2ba52545665c0ebeb96e1052d
-    - name: "Generic CLI Option false positive: --api-key=" + "oddformat sanitizer test input"
-      match: 0e1a81d796b3416d3e36825bbdd5c0216bf0a3527753b8e331e0802d569e7cd5
