@@ -99,6 +99,9 @@ suite("CLI Wrapper Test Suite", () => {
   });
 
   test("sanitizeCliOutputLine redacts values passed to --api-key", () => {
+    // Split so the source carries no `--api-key`-adjacent value literal (which
+    // trips secret scanners' CLI-option detector); the runtime input is still
+    // exactly `--api-key=" + "oddformat`.
     const line = sanitizeCliOutputLine("invalid value for --api-key=" + "oddformat");
     assert.ok(!line.includes("oddformat"));
     assert.ok(line.includes("--api-key=***REDACTED***"));
