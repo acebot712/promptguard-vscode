@@ -115,6 +115,7 @@ Example: `/usr/local/bin/promptguard` or `C:\Program Files\PromptGuard\promptgua
 - `PromptGuard: Redact PII from Selection` - Redact sensitive data from the selected text
 - `PromptGuard: Scan File for Threats` - Scan an entire file for security threats
 - `PromptGuard: Install/Update CLI` - Install or update the PromptGuard CLI
+- `PromptGuard: Refresh` - Reload the PromptGuard views after external changes
 
 Right-click in the editor to Scan/Redact a selection; right-click a file in the Explorer to scan it.
 
