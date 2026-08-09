@@ -2,6 +2,15 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [0.6.2] - 2026-08-10
+
+### Security
+
+- Patched eight dependency advisories: `fast-uri`, `undici`, `js-yaml` and
+  `brace-expansion`. All are development-scope, so none of them ship inside the
+  packaged extension and **no behaviour changes for users** — this release exists
+  so the repository reports clean.
+
 ## [0.6.0] - 2026-06-01
 
 ### Added
