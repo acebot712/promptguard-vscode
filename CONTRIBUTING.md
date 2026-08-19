@@ -73,7 +73,8 @@ Tests use `@vscode/test-electron` and Mocha. They launch a real VS Code instance
 | `src/test/suite/codeActions.test.ts` | Quick-fix code actions |
 | `src/test/suite/treeView.test.ts` | Sidebar tree view provider |
 | `src/test/suite/secrets.test.ts` | Hardcoded secret detection |
-| `src/test/suite/types.test.ts` | Type definitions and interfaces |
+| `src/test/suite/cliContract.test.ts` | CLI JSON contract — exit codes, response schemas, `CliExecutionError`, API-key passing |
+| `src/test/suite/statusBar.test.ts` | Status bar states, and that a failed status reads "Unavailable", not "Not initialized" |
 
 ### Test Entry Point
 
