@@ -29,10 +29,16 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Lint, Test, and Build
+  # Split out from `test` so a lint or formatting failure is reported in
+  # seconds rather than after compile + the xvfb test run have finished. The
+  # two jobs run in PARALLEL, not in sequence -- `lint` is not a gate on
+  # `test`, because on a public repo runner minutes are free and the only thing
+  # worth optimising is how fast a contributor learns something is wrong. Both
+  # verdicts arrive as soon as each is known.
+  lint:
+    name: Lint and Format
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -52,6 +58,23 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Compile TypeScript
         run: npm run compile
 
@@ -62,9 +85,14 @@ jobs:
             exit 1
           fi
 
+      # No `if: runner.os == 'Linux'` here. It used to carry one, on a job
+      # hardcoded to `runs-on: ubuntu-latest` -- so it was always true, and it
+      # read as though a matrix existed. The danger was not the wasted
+      # evaluation but the invitation: anyone adding a Windows or macOS leg
+      # would reasonably assume the tests were already guarded to skip there,
+      # when in fact they would run and need xvfb, which those images lack.
       - name: Run Tests
         run: xvfb-run -a npm test
-        if: runner.os == 'Linux'
 
       - name: Package extension
         # vsce is a pinned devDependency (installed by `npm ci`), not a

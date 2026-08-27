@@ -26,6 +26,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The extraction lives in scripts/changelog-section.sh because the
+      # `build` job below needs the same text for the Release body. While it
+      # was inline here, this gate produced notes nothing consumed and the
+      # release published a hardcoded body instead.
       - name: Require a CHANGELOG section for this tag
         run: |
           case "$GITHUB_REF_NAME" in
@@ -36,20 +40,8 @@ jobs:
               ;;
           esac
           ver="${GITHUB_REF_NAME#v}"
-          awk -v v="$ver" '
-            $0 ~ "^## \\[" v "\\]" { grab=1; next }
-            grab && /^## \[/ { exit }
-            grab { print }
-          ' CHANGELOG.md > notes.md
-          # Present-but-empty is the failure mode to catch, not just a missing
-          # heading -- test for content.
-          if ! grep -q '[^[:space:]]' notes.md; then
-            echo "::error::CHANGELOG.md has no non-empty '## [$ver]' section."
-            echo "::error::Write the release notes for $ver, then re-tag."
-            exit 1
-          fi
           echo "Release notes for $ver:"
-          cat notes.md
+          ./scripts/changelog-section.sh "$ver"
 
   build:
     name: Build and Package Extension
@@ -113,46 +105,25 @@ jobs:
           path: '*.vsix'
           retention-days: 30
 
+      - name: Compose release notes
+        run: |
+          set -euo pipefail
+          ver="${{ steps.get_version.outputs.VERSION }}"
+          {
+            echo "## PromptGuard VS Code Extension v${ver}"
+            echo
+            ./scripts/changelog-section.sh "$ver"
+            # Strip the footer's maintainer comment; GitHub hides it when
+            # rendering but not in the raw body or via the API.
+            sed '/<!--/,/-->/d' .github/release-body-footer.md
+          } > release-notes.md
+          echo "--- composed body ---"; cat release-notes.md
+
       - name: Create Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           name: PromptGuard VS Code Extension v${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## PromptGuard VS Code Extension v${{ steps.get_version.outputs.VERSION }}
-
-            Drop-in LLM security for your applications - directly in VS Code.
-
-            ### Installation
-
-            **From VS Code Marketplace**:
-            1. Open VS Code
-            2. Go to Extensions (Cmd+Shift+X / Ctrl+Shift+X)
-            3. Search for "PromptGuard"
-            4. Click Install
-
-            **From VSIX file**:
-            1. Download the `.vsix` file below
-            2. In VS Code: View → Command Palette → "Extensions: Install from VSIX..."
-            3. Select the downloaded file
-
-            ### Features
-
-            - ✅ LLM SDK detection with real-time diagnostics
-            - ✅ Status bar indicator
-            - ✅ One-click initialization
-            - ✅ Seamless CLI integration
-            - ✅ Support for TypeScript, JavaScript, and Python
-
-            ### Requirements
-
-            - VS Code 1.80.0 or higher
-            - PromptGuard CLI installed (see [CLI releases](https://github.com/acebot712/promptguard-cli/releases))
-
-            ---
-
-            📖 **Documentation**: https://docs.promptguard.co
-            🏠 **Homepage**: https://promptguard.co
-            🐛 **Issues**: https://github.com/promptguard/promptguard-vscode/issues
+          body_path: release-notes.md
           files: '*.vsix'
           draft: false
           prerelease: false
