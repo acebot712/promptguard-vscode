@@ -25,7 +25,18 @@ out/                   # Compiled output (not committed)
 
 ```bash
 npm install
+pre-commit install          # tracked git hooks; once per clone
 ```
+
+`pre-commit install` wires both stages. The push stage runs one thing: a
+gitleaks scan of the commits you are pushing. This extension ships on the VS
+Code Marketplace and the repo is public, so a credential reaching `main` is
+world-readable at once — and CI runs no secret scanning, so this hook is the
+only one there is. It is scoped to the pushed range because scanning the tree
+or the history fails on its first run and teaches everyone `--no-verify`. The
+key-validation and redaction suites are exempted by path in `.gitleaks.toml`;
+their fixtures have to look like keys, and a written exemption beats the
+assemble-from-fragments trick they were using to dodge scanners.
 
 ## Building and Testing
 

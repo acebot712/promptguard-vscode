@@ -1,0 +1,16 @@
+# gitleaks configuration for promptguard-vscode.
+#
+# Extends the stock rules; the allowlist names test suites that are SUPPOSED to
+# contain credential-shaped strings, because what they test is key validation
+# and redaction. secrets.test.ts already assembles its keys from fragments to
+# dodge scanners and gitleaks still flags them -- which is the argument for a
+# written, reviewable exemption over cleverness in the fixture.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "API-key validation and redaction suites: the fixtures have to look like keys."
+paths = [
+  '''src/test/suite/secrets\.test\.ts''',
+  '''src/test/suite/cli\.test\.ts''',
+]
