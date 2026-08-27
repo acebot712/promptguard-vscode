@@ -126,7 +126,15 @@ jobs:
           body_path: release-notes.md
           files: '*.vsix'
           draft: false
-          prerelease: false
+          # Derived from the tag, not hardcoded. A `-` in the tag name means a
+          # pre-release (v0.6.3-rc1), and GitHub should label it as one --
+          # otherwise an rc appears in the Releases list, in the "Latest"
+          # badge and in the API exactly like a final release, and anyone
+          # installing "the latest version" gets a release candidate.
+          #
+          # Matches promptguard-shadow-desktop/.github/workflows/release.yml,
+          # which has always done this; these two were the outliers.
+          prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
