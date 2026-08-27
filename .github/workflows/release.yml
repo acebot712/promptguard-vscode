@@ -191,16 +191,44 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # Still needed, but only for the `vsce` binary itself -- it is a pinned
+      # devDependency rather than a floating global install. Nothing here
+      # compiles: the artifact being published was built and tested in `build`.
       - name: Install dependencies
         run: npm ci
 
-      - name: Compile TypeScript
-        run: npm run compile
+      # PUBLISH THE ARTIFACT `build` PRODUCED, not a fresh one.
+      #
+      # This job used to re-checkout, re-install, re-compile and then run
+      # `vsce publish`, which REPACKAGES from source. So the .vsix attached to
+      # the GitHub Release and the .vsix on the Marketplace were two
+      # independent builds of the same tag -- and only the first had been
+      # through `npm run lint`, `npm run compile` and the xvfb test run in
+      # `build`. Users installed a binary nothing had verified, and any
+      # non-reproducibility between the two builds was invisible by
+      # construction.
+      #
+      # Downloading the artifact makes the tested bytes the published bytes.
+      - name: Download the built extension
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: extension
 
       - name: Publish to VS Code Marketplace
-        # vsce is a pinned devDependency (installed by `npm ci`), not a
-        # floating global install.
-        run: npx vsce publish --no-dependencies
+        # `--packagePath` publishes this exact file. Without it `vsce publish`
+        # would build its own, which is the bug above.
+        run: |
+          set -euo pipefail
+          # Exactly one .vsix, or the glob below would silently pick one of
+          # several and publish a file nobody chose.
+          count=$(find . -maxdepth 1 -name '*.vsix' | wc -l | tr -d ' ')
+          if [ "$count" != "1" ]; then
+            echo "::error::expected exactly one .vsix from the build artifact, found $count" >&2
+            exit 1
+          fi
+          vsix=$(find . -maxdepth 1 -name '*.vsix')
+          echo "Publishing $vsix"
+          npx vsce publish --no-dependencies --packagePath "$vsix"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
