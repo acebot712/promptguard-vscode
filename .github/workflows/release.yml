@@ -120,7 +120,7 @@ jobs:
           echo "--- composed body ---"; cat release-notes.md
 
       - name: Create Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           name: PromptGuard VS Code Extension v${{ steps.get_version.outputs.VERSION }}
           body_path: release-notes.md
@@ -189,7 +189,7 @@ jobs:
       #
       # Downloading the artifact makes the tested bytes the published bytes.
       - name: Download the built extension
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: extension
 
