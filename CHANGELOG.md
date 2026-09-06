@@ -2,6 +2,33 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [0.6.3] - 2026-09-06
+
+**No change to how the extension behaves.** Nothing in this release alters what
+you see or what the extension does; it is recorded rather than skipped so the
+version bump is not unexplained.
+
+### Changed
+
+- **The published `.vsix` is now the artifact that was tested.** The release
+  workflow used to rebuild the extension after CI had passed and publish that
+  second build, so what reached the Marketplace was never the thing the tests
+  ran against. It now downloads and publishes the tested package.
+- Releases are gated on a non-empty CHANGELOG section, and the Release body is
+  built from that section instead of a hardcoded block that described whichever
+  release it was first written for.
+- Pre-release tags are labelled as pre-releases.
+- Secrets are scanned in CI rather than only by a local hook, and the pre-push
+  gate is tracked in the repository instead of living on one machine.
+
+### Fixed
+
+- `npm test` runs on macOS again — `@vscode/test-electron` needed a bump (#33).
+
+Dependency updates in this release are development-scope. The extension
+declares no runtime dependencies at all, so none of them ship inside the
+packaged `.vsix`.
+
 ## [0.6.2] - 2026-08-10
 
 ### Security
@@ -105,4 +132,3 @@ All notable changes to the PromptGuard VS Code extension will be documented in t
 - CLI wrapper for all PromptGuard commands
 - Support for TypeScript, JavaScript, and Python
 - Auto-detection of CLI binary location
-
