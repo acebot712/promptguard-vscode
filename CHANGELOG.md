@@ -2,6 +2,14 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [0.6.4] - 2026-09-18
+
+### Security
+
+- **fast-uri, js-yaml and qs advisories patched** (#38). Development and
+  packaging dependencies; nothing the extension does at runtime changes.
+  Published so the Marketplace build no longer carries the vulnerable versions.
+
 ## [0.6.3] - 2026-09-06
 
 **No change to how the extension behaves.** Nothing in this release alters what
