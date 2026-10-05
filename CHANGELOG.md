@@ -2,6 +2,16 @@
 
 All notable changes to the PromptGuard VS Code extension will be documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- **undici, markdown-it, brace-expansion and fast-uri advisories patched.**
+  Development and packaging dependencies, reached through `@vscode/vsce`;
+  nothing the extension does at runtime changes. One advisory in the same tree
+  has no patched release yet (`braces`, GHSA-vfj7-8cjw-p6xm) and stays until
+  one is published.
+
 ## [0.6.4] - 2026-09-18
 
 ### Security
