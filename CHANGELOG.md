@@ -4,13 +4,34 @@ All notable changes to the PromptGuard VS Code extension will be documented in t
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-10-10
+
+**No change to how the extension behaves.** Nothing under `src` changed since
+0.6.4, and the extension declares no runtime dependencies, so none of the
+packages below ship inside the `.vsix`. Every change is to the development and
+packaging tree; this release exists so that tree's fixes are published rather
+than only merged.
+
 ### Security
 
 - **undici, markdown-it, brace-expansion and fast-uri advisories patched.**
-  Development and packaging dependencies, reached through `@vscode/vsce`;
-  nothing the extension does at runtime changes. One advisory in the same tree
-  has no patched release yet (`braces`, GHSA-vfj7-8cjw-p6xm) and stays until
-  one is published.
+  Development and packaging dependencies, reached through `@vscode/vsce`. The
+  overrides now name the fixed releases: undici 7.29.1, markdown-it 14.3.1,
+  fast-uri 3.1.8, and brace-expansion 1.1.21, 2.1.7 and 5.0.12 on its three
+  release lines.
+- **`braces` (GHSA-vfj7-8cjw-p6xm) is no longer in the tree.** It had no
+  patched release and was reached through `@vscode/vsce` 3 → `secretlint` →
+  `globby` → `fast-glob`. `@vscode/vsce` 4.0.0 drops that chain, and with it
+  undici, markdown-it and fast-uri as well, so only brace-expansion remains of
+  the packages above. `npm audit` reports no findings.
+
+### Changed
+
+- **`@vscode/vsce` 3.9.2 → 4.0.0**, the tool that packages and publishes the
+  extension. It requires Node 22 or later, which CI and the release workflow
+  already use. This is the first release published with it.
+- `@types/node` 25.9.8, `typescript-eslint` (with its parser and plugin) 8.70.1
+  and `prettier` 3.9.9 (#39). Type definitions, lint and formatting only.
 
 ## [0.6.4] - 2026-09-18
 
