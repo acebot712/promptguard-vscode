@@ -4,6 +4,12 @@ All notable changes to the PromptGuard VS Code extension will be documented in t
 
 ## [Unreleased]
 
+### Changed
+
+- `SECURITY.md` links to the published disclosure policy
+  (https://promptguard.co/security#reporting-a-vulnerability) instead of
+  keeping its own copy of the response times.
+
 ## [0.6.5] - 2026-10-10
 
 **No change to how the extension behaves.** Nothing under `src` changed since
