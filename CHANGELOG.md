@@ -4,6 +4,11 @@ All notable changes to the PromptGuard VS Code extension will be documented in t
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-23
+
+**No change to how the extension behaves.** Only `SECURITY.md`, which ships
+inside the `.vsix`, changed since 0.6.5.
+
 ### Changed
 
 - `SECURITY.md` links to the published disclosure policy
